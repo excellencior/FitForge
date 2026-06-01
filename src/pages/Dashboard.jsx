@@ -1,0 +1,986 @@
+import { useState, useEffect } from 'react';
+import { getDailyTotals, getCurrentWeekInCycle, getTodayWorkoutType, getToday, getWorkoutsByDate, getSettings, getWorkoutLogs, getActiveSheet } from '../utils/storage';
+import { workoutTemplates } from '../data/workouts';
+import { useNavigate } from 'react-router-dom';
+import { Dumbbell, Target, ChevronRight, Settings, Zap, CalendarCheck, Award, Sparkles, TrendingUp, Cookie, Sun, CloudSun, Moon } from 'lucide-react';
+import logo from '../assets/fitforge_logo.png';
+
+const safetyTips = [
+  "Training near your max has HIGH injury risk. Perfect form is non-negotiable.",
+  "Rest 3-5 minutes between heavy sets. Your ATP needs time to refuel.",
+  "Crush the bar with a white-knuckle grip. Irradiation = 10-20% more strength.",
+  "Intensity over volume. Fewer sets, higher effort = enjoyable workouts.",
+  "Deload every 6 weeks. It's not laziness — it's strategy.",
+  "If sweating profusely during strength training, you're doing it wrong.",
+  "Hydrate aggressively in Dhaka's heat. 3-4 liters/day minimum.",
+];
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+// --- Calorie Ring Component ---
+function CalorieRing({ consumed, target }) {
+  const radius = 70;
+  const stroke = 8;
+  const normalizedRadius = radius - stroke / 2;
+  const circumference = 2 * Math.PI * normalizedRadius;
+
+  const pct = target > 0 ? Math.min((consumed / target) * 100, 100) : 0;
+  const offset = circumference - (pct / 100) * circumference;
+
+  let ringColor = '#007AFF'; // Beautiful iOS Blue
+  if (pct >= 100) ringColor = '#34C759'; // Success: Green
+  else if (pct > 80) ringColor = '#FF9500'; // High: Orange
+
+  return (
+    <div style={styles.ringWrapper}>
+      <div style={styles.ringContainer}>
+        <svg width={radius * 2} height={radius * 2} style={styles.ringSvg}>
+          {/* background track */}
+          <circle
+            stroke="#F2F2F7"
+            fill="transparent"
+            strokeWidth={stroke}
+            r={normalizedRadius}
+            cx={radius}
+            cy={radius}
+          />
+          {/* progress arc */}
+          <circle
+            stroke={ringColor}
+            fill="transparent"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={offset}
+            r={normalizedRadius}
+            cx={radius}
+            cy={radius}
+            style={{
+              transition: 'stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease',
+              transform: 'rotate(-90deg)',
+              transformOrigin: '50% 50%',
+            }}
+          />
+        </svg>
+        <div style={styles.ringCenter}>
+          <span style={styles.ringPct}>{Math.round(pct)}%</span>
+          <span style={styles.ringCenterLabel}>Target</span>
+        </div>
+      </div>
+      <div style={styles.ringStats}>
+        <div style={styles.ringStatItem}>
+          <span style={styles.ringStatVal}>{consumed}</span>
+          <span style={styles.ringStatLbl}>consumed</span>
+        </div>
+        <div style={styles.ringDivider} />
+        <div style={styles.ringStatItem}>
+          <span style={styles.ringStatVal}>{target}</span>
+          <span style={styles.ringStatLbl}>target kcal</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Macro Row Component (Optimized for Samsung A50s / Narrow Width Viewports) ---
+function MacroRow({ label, current, target, color, icon: Icon }) {
+  const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  return (
+    <div style={styles.macroRowStacked}>
+      <div style={styles.macroRowStackedHeader}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 32,
+            height: 32,
+            borderRadius: '10px',
+            background: `${color}12`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Icon size={15} color={color} strokeWidth={2.5} />
+          </div>
+          <span style={styles.macroRowStackedLabel}>{label}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={styles.macroRowStackedCurrent}>{Math.round(current)}g</span>
+          <span style={styles.macroRowStackedTarget}>/ {target}g</span>
+          <span style={{
+            ...styles.macroRowStackedPct,
+            color: color
+          }}>{Math.round(pct)}%</span>
+        </div>
+      </div>
+      <div style={styles.macroBarBg}>
+        <div
+          style={{
+            ...styles.macroBarFill,
+            width: `${pct}%`,
+            backgroundColor: color,
+            transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// =================== DASHBOARD ===================
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const [totals, setTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [totalDays, setTotalDays] = useState(0);
+  const [cycleInfo, setCycleInfo] = useState({ currentWeek: 1, isDeloadWeek: false, completedCycles: 0 });
+  const [workoutType, setWorkoutType] = useState('A');
+  const [todayWorkouts, setTodayWorkouts] = useState([]);
+  const [tipIndex, setTipIndex] = useState(0);
+  const [milestone, setMilestone] = useState(null);
+  const today = getToday();
+
+  const MILESTONES = [10, 20, 30, 50, 75, 100, 150, 200, 250, 300, 365, 500, 1000];
+  const MILESTONE_MESSAGES = {
+    10: 'Double digits! You showed up.',
+    20: 'Consistency building. Respect.',
+    30: 'A full month of showing up. Beast.',
+    50: 'Half a hundred. You\'re different.',
+    75: 'Three quarters. Unstoppable.',
+    100: 'TRIPLE DIGITS. You\'re a machine.',
+    150: 'Most people quit at 30. You didn\'t.',
+    200: 'Two hundred days. Legend status.',
+    250: 'Quarter thousand. Insane discipline.',
+    300: 'Three hundred. You live this.',
+    365: 'ONE FULL YEAR. Absolute warrior.',
+    500: 'Five hundred. History books.',
+    1000: 'ONE THOUSAND. You ARE the gym.',
+  };
+
+  useEffect(() => {
+    setTotals(getDailyTotals(today));
+    const logs = getWorkoutLogs();
+    const uniqueDays = new Set(logs.map(l => l.date)).size;
+    setTotalDays(uniqueDays);
+    setCycleInfo(getCurrentWeekInCycle());
+    setWorkoutType(getTodayWorkoutType());
+    setTodayWorkouts(getWorkoutsByDate(today));
+    setTipIndex(Math.floor(Math.random() * safetyTips.length));
+
+    // Check milestone
+    const seenKey = 'fitforge_milestones_seen';
+    const seen = JSON.parse(localStorage.getItem(seenKey) || '[]');
+    const hit = MILESTONES.find(m => uniqueDays >= m && !seen.includes(m));
+    if (hit) {
+      setMilestone(hit);
+      localStorage.setItem(seenKey, JSON.stringify([...seen, hit]));
+      setTimeout(() => setMilestone(null), 5000);
+    }
+  }, [today]);
+
+  const settings = getSettings();
+  const activeSheet = getActiveSheet();
+  const template = (activeSheet && activeSheet.exercises && activeSheet.exercises.length > 0)
+    ? { name: activeSheet.name, exercises: activeSheet.exercises }
+    : (workoutTemplates[workoutType] || workoutTemplates.custom);
+  const workoutDone = todayWorkouts.length > 0;
+  const calorieTarget = settings.calorieTarget || 2900;
+
+  return (
+    <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)' }}>
+      {/* ───── Header Top Bar ───── */}
+      <div style={styles.headerTopBar}>
+        <div style={styles.logoContainer}>
+          <img
+            src={logo}
+            alt="FitForge"
+            style={styles.logoImage}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            role="status"
+            aria-label={`Total workout days: ${totalDays}`}
+          >
+            <div style={styles.calendarMiniIcon}>
+              <div style={styles.calendarMiniHeader} />
+              <span style={styles.calendarMiniDay}>{totalDays}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/profile')}
+            aria-label="Settings"
+            style={styles.settingsBtn}
+          >
+            <Settings size={18} color="#636366" strokeWidth={2.2} />
+          </button>
+        </div>
+      </div>
+
+      {/* ───── Hero Greeting Section ───── */}
+      <header style={styles.heroGreetingBlock}>
+        <div>
+          <h1 style={styles.greetingLarge}>
+            {getGreeting()}, <span style={styles.warrior}>{settings.name || 'Warrior'}</span>
+          </h1>
+          <p style={styles.dateLarge}>{formatDate(today)}</p>
+        </div>
+      </header>
+
+      {/* ───── Milestone Celebration ───── */}
+      {milestone && (
+        <div style={styles.milestoneOverlay} onClick={() => setMilestone(null)}>
+          <div style={styles.milestoneCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.milestoneBadgeCircle}>
+              <Award size={36} color="#007AFF" strokeWidth={2.2} />
+            </div>
+            <h2 style={styles.milestoneTitle}>Milestone Achieved!</h2>
+            <div style={styles.milestoneNumberContainer}>
+              <span style={styles.milestoneNumberText}>{milestone}</span>
+              <span style={styles.milestoneNumberSub}>Days Completed</span>
+            </div>
+            <p style={styles.milestoneText}>{MILESTONE_MESSAGES[milestone]}</p>
+            <button style={styles.milestoneButton} onClick={() => setMilestone(null)}>
+              Keep Crusher Mentality
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ───── Calorie Ring ───── */}
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>
+          <Target size={16} color="#007AFF" strokeWidth={2.2} style={{ marginRight: 6 }} />
+          Daily Calories
+        </h2>
+        <CalorieRing consumed={totals.calories} target={calorieTarget} />
+        
+        <div style={styles.calorieRemaining}>
+          {totals.calories < calorieTarget ? (
+            <div style={styles.remainingPillSuccess}>
+              <Target size={14} strokeWidth={2.5} color="#34C759" />
+              <span>{calorieTarget - totals.calories} kcal remaining</span>
+            </div>
+          ) : (
+            <div style={styles.remainingPillDanger}>
+              <Target size={14} strokeWidth={2.5} color="#FF3B30" />
+              <span>Over target by {totals.calories - calorieTarget} kcal</span>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ───── Daily Macronutrients (Optimized Stacked Card) ───── */}
+      <section style={styles.card}>
+        <h2 style={styles.sectionTitle}>
+          <Cookie size={16} color="#FF9500" strokeWidth={2.2} style={{ marginRight: 6 }} />
+          Macronutrients
+        </h2>
+        <div style={styles.macroCardStacked}>
+          <MacroRow label="Protein" current={totals.protein} target={settings.proteinTarget || 160} color="#007AFF" icon={Sun} />
+          <MacroRow label="Carbohydrates" current={totals.carbs} target={settings.carbsTarget || 360} color="#FF9500" icon={CloudSun} />
+          <MacroRow label="Fats" current={totals.fat} target={settings.fatTarget || 80} color="#FF3B30" icon={Moon} />
+        </div>
+      </section>
+
+      {/* ───── Deload Banner ───── */}
+      {cycleInfo.isDeloadWeek && (
+        <div style={styles.deloadBanner}>
+          <Zap size={18} color="#FF9500" strokeWidth={2.2} />
+          <div>
+            <strong style={styles.deloadTitle}>DELOAD WEEK</strong>
+            <p style={styles.deloadSub}>Recover &amp; Rebuild</p>
+          </div>
+        </div>
+      )}
+
+      {/* ───── Today's Workout Pill ───── */}
+      <section
+        onClick={() => !workoutDone && navigate('/workout')}
+        style={{
+          ...styles.workoutPillCard,
+          cursor: workoutDone ? 'default' : 'pointer',
+        }}
+      >
+        <div style={styles.workoutPillContent}>
+          <div style={styles.workoutPillIconWrap}>
+            <Dumbbell size={18} strokeWidth={2.2} color={workoutDone ? '#34C759' : '#007AFF'} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={styles.workoutPillSub}>{workoutDone ? 'Routine Completed' : 'Today\'s Routine'}</span>
+            <h3 style={styles.workoutPillTitle}>{template.name}</h3>
+            <span style={styles.workoutPillMeta}>{template.exercises.length} exercises</span>
+          </div>
+          <div>
+            {workoutDone ? (
+              <div style={styles.workoutPillDoneBadge}>
+                <span style={styles.workoutPillDoneText}>Completed</span>
+              </div>
+            ) : (
+              <div style={styles.workoutPillStartBadge}>
+                <span>Start</span>
+                <ChevronRight size={14} strokeWidth={2.5} />
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ───── Training Week Progress ───── */}
+      <section style={styles.card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+          <TrendingUp size={16} color="#5856D6" strokeWidth={2.2} />
+          <h2 style={{ ...styles.sectionTitle, margin: 0 }}>Training Cycle</h2>
+        </div>
+        <p style={styles.cycleSubtitle}>
+          Week {cycleInfo.currentWeek} of 7 · Cycle {cycleInfo.completedCycles + 1}
+        </p>
+        <div style={styles.weekRow}>
+          {[1, 2, 3, 4, 5, 6, 7].map((w) => {
+            const isPast = w < cycleInfo.currentWeek;
+            const isCurrent = w === cycleInfo.currentWeek;
+            const isDeload = w === 7;
+
+            let dotBg = '#F2F2F7';
+            let textColor = '#AEAEB2';
+            let border = '1px solid transparent';
+
+            if (isPast) {
+              dotBg = '#E8F0FE';
+              textColor = '#007AFF';
+            } else if (isCurrent) {
+              dotBg = isDeload ? '#FFF3E0' : '#EDE7F6';
+              textColor = isDeload ? '#FF9500' : '#5856D6';
+              border = `1.5px solid ${isDeload ? '#FF9500' : '#5856D6'}`;
+            }
+
+            return (
+              <div
+                key={w}
+                style={{
+                  ...styles.weekDot,
+                  backgroundColor: dotBg,
+                  border: border,
+                }}
+              >
+                <span style={{
+                  ...styles.weekNum,
+                  color: textColor,
+                  fontWeight: isCurrent ? '700' : '600',
+                }}>{w}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={styles.weekLabels}>
+          <span style={styles.weekLabelText}>Training</span>
+          <span style={{ ...styles.weekLabelText, color: '#FF9500' }}>Deload</span>
+        </div>
+      </section>
+
+      {/* ───── Safety Tip ───── */}
+      <section style={styles.tipCard}>
+        <div style={styles.tipHeader}>
+          <div style={styles.tipIconBg}>
+            <Sparkles size={16} color="#FF9500" strokeWidth={2.2} />
+          </div>
+          <span style={styles.tipTitle}>Pro Safety Tip</span>
+        </div>
+        <p style={styles.tipText}>{safetyTips[tipIndex]}</p>
+      </section>
+    </div>
+  );
+}
+
+// =================== STYLES ===================
+const styles = {
+  headerTopBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingTop: 8,
+  },
+  heroGreetingBlock: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 24,
+  },
+  greetingLarge: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    margin: 0,
+    letterSpacing: '-0.04em',
+    lineHeight: 1.2,
+  },
+  dateLarge: {
+    fontSize: 11,
+    color: '#8E8E93',
+    margin: '4px 0 0',
+    fontWeight: '700',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  daysBadgeLarge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: '#FFFFFF',
+    borderRadius: 14,
+    padding: '4px 12px 4px 6px',
+    border: '1px solid #E5E5EA',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  logoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    overflow: 'hidden',
+    border: '1.5px solid #E5E5EA',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#FFFFFF',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  greeting: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    margin: 0,
+    letterSpacing: '-0.03em',
+    lineHeight: 1.25,
+  },
+  warrior: {
+    background: 'linear-gradient(135deg, #007AFF, #5856D6)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  date: {
+    fontSize: 11,
+    color: '#8E8E93',
+    margin: '2px 0 0',
+    fontWeight: '700',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+  },
+  daysBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: '#FFFFFF',
+    borderRadius: 14,
+    padding: '4px 12px 4px 6px',
+    border: '1px solid #E5E5EA',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+  },
+  calendarMiniIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    border: '1px solid #E5E5EA',
+    background: '#FFFFFF',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+  },
+  calendarMiniHeader: {
+    height: 6,
+    background: '#FF3B30',
+    width: '100%',
+  },
+  calendarMiniDay: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    lineHeight: '20px',
+    fontFamily: 'var(--font-family)',
+  },
+  daysBadgeText: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  daysBadgeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  settingsBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: '50%',
+    background: '#FFFFFF',
+    border: '1px solid #E5E5EA',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+    WebkitTapHighlightColor: 'transparent',
+    transition: 'background-color 0.2s ease',
+  },
+
+  // Milestone Celebration
+  milestoneOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(255, 255, 255, 0.85)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    zIndex: 9999,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    animation: 'dashFadeIn 0.3s ease',
+  },
+  milestoneCard: {
+    background: '#FFFFFF',
+    borderRadius: 24,
+    padding: '32px 24px',
+    width: '90%',
+    maxWidth: 360,
+    textAlign: 'center',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.05)',
+    border: '1px solid #E5E5EA',
+    animation: 'dashMilestonePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+  },
+  milestoneBadgeCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: '50%',
+    background: '#E8F0FE',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 20px',
+  },
+  milestoneTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    margin: '0 0 12px 0',
+    letterSpacing: '-0.02em',
+  },
+  milestoneNumberContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  milestoneNumberText: {
+    fontSize: 60,
+    fontWeight: '900',
+    color: '#007AFF',
+    lineHeight: 1,
+    letterSpacing: '-0.04em',
+  },
+  milestoneNumberSub: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginTop: 4,
+  },
+  milestoneText: {
+    fontSize: 15,
+    color: '#48484A',
+    lineHeight: 1.5,
+    margin: '0 0 24px 0',
+    fontWeight: '500',
+  },
+  milestoneButton: {
+    background: '#F2F2F7',
+    color: '#1C1C1E',
+    border: 'none',
+    borderRadius: 14,
+    padding: '14px 28px',
+    fontSize: 14,
+    fontWeight: '700',
+    width: '100%',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+  },
+
+  // Card
+  card: {
+    background: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 20,
+    border: '1px solid #E5E5EA',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8E8E93',
+    margin: '0 0 16px',
+    display: 'flex',
+    alignItems: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+  },
+
+  // Calorie Ring Layout
+  ringWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 24,
+    padding: '8px 0',
+  },
+  ringContainer: {
+    position: 'relative',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  ringSvg: {
+    filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.02))',
+  },
+  ringCenter: {
+    position: 'absolute',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  ringPct: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    letterSpacing: '-0.03em',
+    lineHeight: 1.1,
+  },
+  ringCenterLabel: {
+    fontSize: 10,
+    color: '#8E8E93',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    marginTop: 2,
+  },
+  ringStats: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  ringStatItem: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  ringStatVal: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    letterSpacing: '-0.02em',
+  },
+  ringStatLbl: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+  },
+  ringDivider: {
+    height: 1,
+    background: '#E5E5EA',
+    width: '100%',
+  },
+  calorieRemaining: {
+    marginTop: 16,
+    borderTop: '1px solid #E5E5EA',
+    paddingTop: 12,
+  },
+  remainingPillSuccess: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    background: '#E8F5E9',
+    borderRadius: 12,
+    padding: '8px 12px',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#34C759',
+  },
+  remainingPillDanger: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    background: '#FFEBEE',
+    borderRadius: 12,
+    padding: '8px 12px',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FF3B30',
+  },
+
+  // Macro Cards Stacked Layout
+  macroCardStacked: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  macroRowStacked: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  macroRowStackedHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  macroRowStackedLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    letterSpacing: '-0.01em',
+  },
+  macroRowStackedCurrent: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1C1C1E',
+  },
+  macroRowStackedTarget: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontWeight: '600',
+  },
+  macroRowStackedPct: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 6,
+  },
+  macroBarBg: {
+    height: 5,
+    borderRadius: 3,
+    background: '#F2F2F7',
+    overflow: 'hidden',
+  },
+  macroBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+
+  // Deload Banner
+  deloadBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    background: '#FFF3E0',
+    borderRadius: 18,
+    padding: '12px 16px',
+    marginBottom: 20,
+    border: '1px solid rgba(255, 149, 0, 0.15)',
+  },
+  deloadTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FF9500',
+    letterSpacing: '0.04em',
+    display: 'block',
+  },
+  deloadSub: {
+    fontSize: 12,
+    color: '#636366',
+    margin: '1px 0 0',
+    fontWeight: '500',
+  },
+
+  // Today Workout Pill
+  workoutPillCard: {
+    background: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+    border: '1px solid #E5E5EA',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    userSelect: 'none',
+    WebkitTapHighlightColor: 'transparent',
+  },
+  workoutPillContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  },
+  workoutPillIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    background: '#F2F2F7',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workoutPillSub: {
+    fontSize: 10,
+    color: '#8E8E93',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    display: 'block',
+  },
+  workoutPillTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    margin: '2px 0',
+    letterSpacing: '-0.02em',
+  },
+  workoutPillMeta: {
+    fontSize: 12,
+    color: '#8E8E93',
+    fontWeight: '500',
+  },
+  workoutPillDoneBadge: {
+    background: '#E8F5E9',
+    borderRadius: 20,
+    padding: '6px 12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workoutPillDoneText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#34C759',
+  },
+  workoutPillStartBadge: {
+    background: '#E8F0FE',
+    color: '#007AFF',
+    borderRadius: 20,
+    padding: '6px 12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Training Cycle
+  cycleSubtitle: {
+    fontSize: 13,
+    color: '#8E8E93',
+    fontWeight: '600',
+    margin: '0 0 16px',
+    letterSpacing: '-0.01em',
+  },
+  weekRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  weekDot: {
+    flex: 1,
+    aspectRatio: '1 / 1',
+    maxWidth: 44,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background-color 0.3s ease, border 0.3s ease',
+  },
+  weekNum: {
+    fontSize: 13,
+  },
+  weekLabels: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    borderTop: '1px solid #E5E5EA',
+    paddingTop: 8,
+  },
+  weekLabelText: {
+    fontSize: 10,
+    color: '#8E8E93',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  },
+
+  // Safety Tip
+  tipCard: {
+    background: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+    border: '1px solid #E5E5EA',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+  },
+  tipHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  tipIconBg: {
+    width: 26,
+    height: 26,
+    borderRadius: '50%',
+    background: '#FFF3E0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tipTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FF9500',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  tipText: {
+    fontSize: 13,
+    color: '#48484A',
+    fontWeight: '500',
+    lineHeight: 1.5,
+    margin: 0,
+  },
+};
+
+// Inject milestone keyframes
+if (typeof document !== 'undefined' && !document.getElementById('dash-milestone-keyframes')) {
+  const style = document.createElement('style');
+  style.id = 'dash-milestone-keyframes';
+  style.textContent = `
+    @keyframes dashFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes dashMilestonePop {
+      0% { transform: scale(0.9) translateY(20px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+}
