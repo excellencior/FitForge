@@ -75,8 +75,8 @@ function Workout() {
   const [completionDuration, setCompletionDuration] = useState(0);
   const [showFlexChoice, setShowFlexChoice] = useState(false);
   const [todayWorkouts, setTodayWorkouts] = useState([]);
-  const [showGoAgainWarning, setShowGoAgainWarning] = useState(false);
   const [totalRestTimeSpent, setTotalRestTimeSpent] = useState(0);
+  const [exerciseRestTimes, setExerciseRestTimes] = useState({});
   const [completionStats, setCompletionStats] = useState({
     actualSets: 0,
     totalDurationSecs: 0,
@@ -116,6 +116,7 @@ function Workout() {
             setPrsHit(session.prsHit);
             setWorkoutStartTime(session.workoutStartTime);
             setTotalRestTimeSpent(session.totalRestTimeSpent || 0);
+            setExerciseRestTimes(session.exerciseRestTimes || {});
             return; // successfully loaded, skip default initialization
           } else {
             // Stale/out-of-sync session, clear it to reload the new active sheet!
@@ -166,6 +167,7 @@ function Workout() {
         prsHit,
         workoutStartTime,
         totalRestTimeSpent,
+        exerciseRestTimes,
       };
       localStorage.setItem('fitforge_active_workout_session', JSON.stringify(session));
     } else if (mode === 'plan' || mode === 'complete') {
@@ -174,7 +176,7 @@ function Workout() {
   }, [
     mode, workoutType, template, currentExIdx, currentSet, repsInput, weightInput,
     isResting, restTime, restTotal, timerPaused, workoutLog, prsHit, workoutStartTime,
-    totalRestTimeSpent
+    totalRestTimeSpent, exerciseRestTimes
   ]);
 
 
@@ -188,6 +190,16 @@ function Workout() {
     if (isResting && !timerPaused) {
       timerRef.current = setInterval(() => {
         setTotalRestTimeSpent(prevSpent => prevSpent + 1);
+        
+        // Accumulate rest time for the current exercise
+        const currentExId = template?.exercises?.[currentExIdx]?.exerciseId;
+        if (currentExId) {
+          setExerciseRestTimes(prev => ({
+            ...prev,
+            [currentExId]: (prev[currentExId] || 0) + 1
+          }));
+        }
+
         setRestTime(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -282,6 +294,7 @@ function Workout() {
     setPrsHit([]);
     setWorkoutStartTime(Date.now());
     setTotalRestTimeSpent(0);
+    setExerciseRestTimes({});
     const firstEx = template.exercises[0];
     setWeightInput(getExerciseWeight(firstEx.exerciseId, firstEx.weight).toString());
     setRepsInput(firstEx.reps.toString());
@@ -633,7 +646,14 @@ function Workout() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, paddingTop: 8, borderTop: '1px solid #F2F2F7' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8E8E93', fontWeight: '600' }}>
-                      <Timer size={11} strokeWidth={2.2} /> {exT.restMinutes}m rest
+                      <Timer size={11} strokeWidth={2.2} />
+                      {(() => {
+                        const actualRestSecs = exerciseRestTimes[exT.exerciseId] || 0;
+                        if (actualRestSecs === 0) return 'No rest';
+                        const mins = Math.floor(actualRestSecs / 60);
+                        const secs = actualRestSecs % 60;
+                        return mins === 0 ? `${secs}s rest` : `${mins}m ${secs}s rest`;
+                      })()}
                     </span>
                     {exerciseDuration !== null && exerciseDuration > 0 && (
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8E8E93', fontWeight: '600' }}>
