@@ -39,28 +39,44 @@ export default function Modal({ isOpen, onClose, title, type = 'bottom-sheet', c
         role="dialog"
         aria-modal="true"
       >
-        {!isAlert && <div className="modal-handle" />}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isAlert ? 12 : 20 }}>
-          {title && <h2 style={{ fontSize: isAlert ? 18 : 20, fontWeight: '800', margin: 0, color: '#1C1C1E', textAlign: isAlert ? 'center' : 'left', flex: 1, letterSpacing: '-0.02em' }}>{title}</h2>}
-          {!isAlert && (
-            <button 
-              onClick={onClose} 
-              style={{ 
-                background: 'transparent', 
-                border: 'none', 
-                cursor: 'pointer', 
-                color: '#8E8E93', 
-                padding: 4, 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}
-              aria-label="Close modal"
-            >
-              <X size={20} strokeWidth={2.2} />
-            </button>
-          )}
-        </div>
+        {!isAlert && (
+          <div style={{
+            position: 'sticky',
+            top: -24,
+            background: 'var(--bg-secondary)',
+            zIndex: 100,
+            margin: '-24px -20px 20px -20px',
+            padding: '24px 20px 0 20px',
+            borderTopLeftRadius: '22px',
+            borderTopRightRadius: '22px',
+          }}>
+            <div className="modal-handle" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              {title && <h2 style={{ fontSize: 20, fontWeight: '800', margin: 0, color: '#1C1C1E', textAlign: 'left', flex: 1, letterSpacing: '-0.02em' }}>{title}</h2>}
+              <button 
+                onClick={onClose} 
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  color: '#8E8E93', 
+                  padding: 4, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center' 
+                }}
+                aria-label="Close modal"
+              >
+                <X size={20} strokeWidth={2.2} />
+              </button>
+            </div>
+          </div>
+        )}
+        {isAlert && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            {title && <h2 style={{ fontSize: 18, fontWeight: '800', margin: 0, color: '#1C1C1E', textAlign: 'center', flex: 1, letterSpacing: '-0.02em' }}>{title}</h2>}
+          </div>
+        )}
         {children}
       </div>
     </div>
