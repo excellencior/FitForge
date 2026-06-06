@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { getSettings, saveSettings, calculateTDEE, getDeloadTracker, updateDeloadTracker, getToday } from '../utils/storage';
 import { useModalLock, useInputFocus } from '../utils/ux';
+import Modal from '../components/Modal';
 import logo from '../assets/fitforge_logo.png';
 import { 
   Save, 
@@ -24,6 +25,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(() => getSettings());
   const [saved, setSaved] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [showReset, setShowReset] = useState(false);
   const [deloadTracker, setDeloadTrackerState] = useState(() => getDeloadTracker());
   const saveTimerRef = useRef(null);
@@ -32,6 +34,36 @@ export default function Profile() {
   useModalLock(showReset);
 
   const handleSave = () => {
+    setErrorMsg('');
+    if (!settings.name || !settings.name.trim()) {
+      setErrorMsg('Name cannot be empty.');
+      return;
+    }
+    if (!settings.heightCm || isNaN(settings.heightCm) || settings.heightCm <= 0 || settings.heightCm > 300) {
+      setErrorMsg('Please enter a valid height (1-300 cm).');
+      return;
+    }
+    if (!settings.weightKg || isNaN(settings.weightKg) || settings.weightKg <= 0 || settings.weightKg > 500) {
+      setErrorMsg('Please enter a valid weight (1-500 kg).');
+      return;
+    }
+    if (!settings.calorieTarget || isNaN(settings.calorieTarget) || settings.calorieTarget <= 0) {
+      setErrorMsg('Please enter a valid daily calorie target.');
+      return;
+    }
+    if (settings.proteinTarget === undefined || isNaN(settings.proteinTarget) || settings.proteinTarget < 0) {
+      setErrorMsg('Please enter a valid protein target.');
+      return;
+    }
+    if (settings.carbsTarget === undefined || isNaN(settings.carbsTarget) || settings.carbsTarget < 0) {
+      setErrorMsg('Please enter a valid carbs target.');
+      return;
+    }
+    if (settings.fatTarget === undefined || isNaN(settings.fatTarget) || settings.fatTarget < 0) {
+      setErrorMsg('Please enter a valid fat target.');
+      return;
+    }
+
     saveSettings(settings);
     setSaved(true);
     clearTimeout(saveTimerRef.current);
@@ -495,6 +527,25 @@ export default function Profile() {
           </div>
         </div>
 
+        {errorMsg && (
+          <div style={{
+            backgroundColor: '#FFEBEE',
+            color: '#FF3B30',
+            padding: '10px 14px',
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 16,
+            marginTop: 16
+          }}>
+            <AlertTriangle size={16} strokeWidth={2.4} />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         <button 
           onClick={handleSave}
           style={{
@@ -572,80 +623,39 @@ export default function Profile() {
       </div>
 
       {/* Reset Modal */}
-      {showReset && (
-        <div className="modal-overlay" onClick={() => setShowReset(false)} style={{ zIndex: 9999 }}>
-          <div 
-            className="modal-content" 
-            onClick={e => e.stopPropagation()} 
-            role="dialog" 
-            aria-modal="true"
-            style={{
-              background: '#FFFFFF',
-              borderRadius: '24px 24px 0 0',
-              padding: '24px 20px calc(24px + var(--safe-bottom))',
-            }}
-          >
-            <div className="modal-handle" style={{ background: '#E5E5EA', width: 40, height: 5 }} />
-            <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <div style={{ 
-                width: 56, 
-                height: 56, 
-                borderRadius: '50%', 
-                background: '#FF3B3010', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                margin: '0 auto 16px'
-              }}>
-                <AlertTriangle size={28} color="#FF3B30" strokeWidth={2.2} />
-              </div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8, letterSpacing: '-0.03em', color: '#1C1C1E' }}>Reset All Data?</h2>
-              <p style={{ fontSize: 14, color: '#8E8E93', marginBottom: 28, lineHeight: 1.5, padding: '0 8px', fontWeight: 500 }}>
-                This action cannot be undone. All workout logs, diet entries, body stats, and progress will be permanently deleted.
-              </p>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button 
-                  className="btn" 
-                  style={{ 
-                    flex: 1, 
-                    background: '#F2F2F7', 
-                    color: '#1C1C1E', 
-                    borderRadius: 14,
-                    fontWeight: 600,
-                    border: 'none',
-                    cursor: 'pointer',
-                    minHeight: 48
-                  }} 
-                  onClick={() => setShowReset(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  className="btn" 
-                  style={{ 
-                    flex: 1, 
-                    background: '#FF3B30', 
-                    color: '#FFFFFF', 
-                    borderRadius: 14,
-                    fontWeight: 600,
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    minHeight: 48
-                  }} 
-                  onClick={handleReset}
-                >
-                  <RotateCcw size={16} strokeWidth={2.2} />
-                  <span>Delete Everything</span>
-                </button>
-              </div>
-            </div>
-          </div>
+      <Modal isOpen={showReset} onClose={() => setShowReset(false)} type="centered-alert">
+        <div style={{ 
+          width: 56, 
+          height: 56, 
+          borderRadius: '50%', 
+          background: '#FF3B3010', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          margin: '0 auto 16px'
+        }}>
+          <AlertTriangle size={28} color="#FF3B30" strokeWidth={2.2} />
         </div>
-      )}
+        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8, letterSpacing: '-0.03em', color: '#1C1C1E' }}>Reset All Data?</h2>
+        <p style={{ fontSize: 13, color: '#8E8E93', marginBottom: 24, lineHeight: 1.5, padding: '0 8px', fontWeight: 500 }}>
+          This action cannot be undone. All workout logs, diet entries, body stats, and progress will be permanently deleted.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button 
+            className="btn btn-secondary w-full"
+            onClick={() => setShowReset(false)}
+          >
+            Cancel
+          </button>
+          <button 
+            className="btn btn-danger w-full" 
+            onClick={handleReset}
+          >
+            <RotateCcw size={16} strokeWidth={2.2} />
+            <span>Delete Everything</span>
+          </button>
+        </div>
+      </Modal>
 
       {/* Footer */}
       <div 

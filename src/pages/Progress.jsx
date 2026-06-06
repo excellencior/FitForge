@@ -70,8 +70,8 @@ export default function Progress() {
     
     mainLifts.forEach(exId => {
       const logs = workoutLogs
-        .filter(l => l.exercises)
-        .flatMap(l => l.exercises.filter(e => e.exerciseId === exId).map(e => ({ date: l.date, weight: e.weight, reps: e.reps })))
+        .filter(l => l.sets)
+        .flatMap(l => l.sets.filter(s => s.exerciseId === exId).map(s => ({ date: l.date, weight: s.weight, reps: s.reps })))
         .sort((a, b) => a.date.localeCompare(b.date));
       
       if (logs.length > 0) exerciseProgress[exId] = logs;

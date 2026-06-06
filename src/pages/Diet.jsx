@@ -200,7 +200,10 @@ export default function Diet() {
   /* actions */
   const handleAdd = useCallback((food, meal) => {
     if (!debounceAdd()) return;
-    const mult = multipliers[food.id] || 1;
+    let mult = multipliers[food.id];
+    if (mult === undefined || mult === '' || isNaN(mult) || mult <= 0) {
+      mult = 1;
+    }
     const entry = {
       foodId: food.id,
       name: food.name,
@@ -594,6 +597,37 @@ export default function Diet() {
                                 {m}×
                               </button>
                             ))}
+                          </div>
+
+                          {/* Custom Serving Multiplier Input */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+                            <span style={{ fontSize: 12, color: '#636366', fontWeight: 600 }}>Custom Portion:</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="0.1"
+                              min="0.1"
+                              value={multipliers[food.id] !== undefined ? multipliers[food.id] : ''}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value);
+                                setMultipliers(p => ({ ...p, [food.id]: isNaN(val) ? '' : val }));
+                              }}
+                              onFocus={onFocusInput}
+                              placeholder="1.0"
+                              style={{
+                                width: 70,
+                                padding: '6px 10px',
+                                border: '1px solid #E5E5EA',
+                                borderRadius: 8,
+                                background: '#FFFFFF',
+                                fontSize: 13,
+                                color: '#1C1C1E',
+                                fontWeight: '600',
+                                textAlign: 'center',
+                                outline: 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: 12, color: '#8E8E93', fontWeight: '500' }}>servings</span>
                           </div>
                         </div>
                       )}

@@ -5,6 +5,7 @@ import {
 } from '../utils/storage';
 import { useModalLock, useInputFocus, useToast } from '../utils/ux';
 import { exercises as defaultExercises } from '../data/workouts';
+import Modal from '../components/Modal';
 import {
   Plus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
   Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star, Calendar,
@@ -668,77 +669,12 @@ export default function WorkoutSheets() {
       </div>
 
       {/* ===== SHEET EDITOR MODAL ===== */}
-      {showEditor && editingSheet && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => { setShowEditor(false); setEditingSheet(null); }}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: 16,
-          }}
-        >
-          <div 
-            className="modal-content" 
-            style={{ 
-              maxHeight: '90vh', 
-              width: '100%',
-              maxWidth: 440,
-              background: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '24px',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-              overflowY: 'auto',
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 20,
-              boxSizing: 'border-box',
-            }} 
-            onClick={e => e.stopPropagation()} 
-            role="dialog" 
-            aria-modal="true"
-          >
-            <div style={{
-              width: 36,
-              height: 5,
-              borderRadius: '2.5px',
-              background: '#E5E5EA',
-              alignSelf: 'center',
-              marginBottom: 4,
-            }} />
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1C1C1E', letterSpacing: '-0.02em', margin: 0 }}>
-                {editingSheet.id ? 'Edit Sheet' : 'New Workout Sheet'}
-              </h2>
-              <button 
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: '#F2F2F7',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  marginLeft: 'auto'
-                }} 
-                onClick={() => { setShowEditor(false); setEditingSheet(null); }}
-              >
-                <X size={14} strokeWidth={2.4} color="#8E8E93" />
-              </button>
-            </div>
+      <Modal
+        isOpen={showEditor && !!editingSheet}
+        onClose={() => { setShowEditor(false); setEditingSheet(null); }}
+        title={editingSheet?.id ? 'Edit Sheet' : 'New Workout Sheet'}
+        type="bottom-sheet"
+      >
 
             {/* Sheet Info */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1206,82 +1142,15 @@ export default function WorkoutSheets() {
             >
               <Check size={16} strokeWidth={2.4} /> {editingSheet.id ? 'Save Changes' : 'Create Sheet'}
             </button>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* ===== EXERCISE CATALOG MODAL ===== */}
-      {showCatalog && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => setShowCatalog(false)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1010,
-            padding: 16,
-          }}
-        >
-          <div 
-            className="modal-content" 
-            style={{ 
-              maxHeight: '80vh', 
-              width: '100%',
-              maxWidth: 400,
-              background: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '24px',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-              overflowY: 'auto',
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              boxSizing: 'border-box',
-            }} 
-            onClick={e => e.stopPropagation()} 
-            role="dialog" 
-            aria-modal="true"
-          >
-            <div style={{
-              width: 36,
-              height: 5,
-              borderRadius: '2.5px',
-              background: '#E5E5EA',
-              alignSelf: 'center',
-              marginBottom: 4,
-            }} />
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1C1C1E', letterSpacing: '-0.02em', margin: 0 }}>
-                Add Exercise
-              </h2>
-              <button 
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: '#F2F2F7',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  marginLeft: 'auto'
-                }} 
-                onClick={() => setShowCatalog(false)}
-              >
-                <X size={14} strokeWidth={2.4} color="#8E8E93" />
-              </button>
-            </div>
+      <Modal
+        isOpen={showCatalog}
+        onClose={() => setShowCatalog(false)}
+        title="Add Exercise"
+        type="bottom-sheet"
+      >
 
             {/* Filter chips */}
             <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
@@ -1372,115 +1241,71 @@ export default function WorkoutSheets() {
                   );
                 })}
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* ===== DELETE CONFIRMATION ===== */}
-      {showDeleteConfirm && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => setShowDeleteConfirm(null)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1020,
-            padding: 16,
-          }}
-        >
-          <div 
-            className="modal-content" 
+      <Modal
+        isOpen={!!showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(null)}
+        type="centered-alert"
+      >
+        <div style={{
+          width: 48,
+          height: 48,
+          borderRadius: '50%',
+          background: '#FFF0F0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 12,
+          margin: '0 auto 12px'
+        }}>
+          <Trash2 size={22} strokeWidth={2.2} color="#E04F4F" />
+        </div>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1C1C1E', marginBottom: 6, margin: 0 }}>Delete this sheet?</h2>
+        <p style={{ fontSize: 12, color: '#8E8E93', marginBottom: 20, lineHeight: 1.5, margin: '6px 0 20px' }}>
+          This action cannot be undone.
+          {activeSheet?.id === showDeleteConfirm && ' The active sheet will switch to your default.'}
+        </p>
+        <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+          <button 
             style={{ 
-              width: '100%',
-              maxWidth: 320,
-              background: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '24px',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              boxSizing: 'border-box',
-            }}
-            onClick={e => e.stopPropagation()} 
-            role="dialog" 
-            aria-modal="true"
+              flex: 1,
+              background: '#F2F2F7',
+              color: '#1C1C1E',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }} 
+            onClick={() => setShowDeleteConfirm(null)}
           >
-            <div style={{
-              width: 36,
-              height: 5,
-              borderRadius: '2.5px',
-              background: '#E5E5EA',
-              marginBottom: 16,
-            }} />
-            <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
+            Cancel
+          </button>
+          <button 
+            style={{ 
+              flex: 1,
               background: '#FFF0F0',
+              color: '#E04F4F',
+              border: '1px solid #FFD1D1',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: 12,
-            }}>
-              <Trash2 size={22} strokeWidth={2.2} color="#E04F4F" />
-            </div>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1C1C1E', marginBottom: 6, margin: 0 }}>Delete this sheet?</h2>
-            <p style={{ fontSize: 12, color: '#8E8E93', marginBottom: 20, lineHeight: 1.5, margin: '6px 0 20px' }}>
-              This action cannot be undone.
-              {activeSheet?.id === showDeleteConfirm && ' The active sheet will switch to your default.'}
-            </p>
-            <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-              <button 
-                style={{ 
-                  flex: 1,
-                  background: '#F2F2F7',
-                  color: '#1C1C1E',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '10px 16px',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }} 
-                onClick={() => setShowDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button 
-                style={{ 
-                  flex: 1,
-                  background: '#FFF0F0',
-                  color: '#E04F4F',
-                  border: '1px solid #FFD1D1',
-                  borderRadius: '12px',
-                  padding: '10px 16px',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                }} 
-                onClick={() => handleDelete(showDeleteConfirm)}
-              >
-                <Trash2 size={12} strokeWidth={2.4} /> Delete
-              </button>
-            </div>
-          </div>
+              gap: 4,
+            }} 
+            onClick={() => handleDelete(showDeleteConfirm)}
+          >
+            <Trash2 size={12} strokeWidth={2.4} /> Delete
+          </button>
         </div>
-      )}
+      </Modal>
 
       {/* ── Toast Notification ── */}
       {toast && (

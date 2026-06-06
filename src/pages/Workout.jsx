@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Check, ChevronDown, ChevronUp, AlertTriangle, Timer, Trophy, X, Plus, Zap, Dumbbell, Activity, Shield, Footprints, Compass } from 'lucide-react';
+import { Play, Pause, RotateCcw, Check, ChevronDown, ChevronUp, ChevronRight, AlertTriangle, Timer, Trophy, X, Plus, Zap, Dumbbell, Activity, Shield, Footprints, Compass } from 'lucide-react';
 import { exercises, workoutTemplates, warmupRoutine, warmupSets, irradiationChecklist } from '../data/workouts';
-import { getTodayWorkoutType, saveWorkoutLog, updatePR, getToday, getPRRecords, getActiveSheet } from '../utils/storage';
+import { getTodayWorkoutType, saveWorkoutLog, updatePR, getToday, getPRRecords, getActiveSheet, getWorkoutsByDate, getSettings } from '../utils/storage';
 import { useInputFocus, useDebounce } from '../utils/ux';
+import Modal from '../components/Modal';
 import './Workout.css';
 
 const playRestChime = (isFinal = false) => {
@@ -73,6 +74,16 @@ function Workout() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [completionDuration, setCompletionDuration] = useState(0);
   const [showFlexChoice, setShowFlexChoice] = useState(false);
+  const [todayWorkouts, setTodayWorkouts] = useState([]);
+  const [showGoAgainWarning, setShowGoAgainWarning] = useState(false);
+  const [totalRestTimeSpent, setTotalRestTimeSpent] = useState(0);
+  const [completionStats, setCompletionStats] = useState({
+    actualSets: 0,
+    totalDurationSecs: 0,
+    totalRestSecs: 0,
+    totalExerciseSecs: 0,
+    caloriesBurnt: 0
+  });
 
   const timerRef = useRef(null);
 
@@ -104,6 +115,7 @@ function Workout() {
             setWorkoutLog(session.workoutLog);
             setPrsHit(session.prsHit);
             setWorkoutStartTime(session.workoutStartTime);
+            setTotalRestTimeSpent(session.totalRestTimeSpent || 0);
             return; // successfully loaded, skip default initialization
           } else {
             // Stale/out-of-sync session, clear it to reload the new active sheet!
@@ -153,6 +165,7 @@ function Workout() {
         workoutLog,
         prsHit,
         workoutStartTime,
+        totalRestTimeSpent,
       };
       localStorage.setItem('fitforge_active_workout_session', JSON.stringify(session));
     } else if (mode === 'plan' || mode === 'complete') {
@@ -160,14 +173,21 @@ function Workout() {
     }
   }, [
     mode, workoutType, template, currentExIdx, currentSet, repsInput, weightInput,
-    isResting, restTime, restTotal, timerPaused, workoutLog, prsHit, workoutStartTime
+    isResting, restTime, restTotal, timerPaused, workoutLog, prsHit, workoutStartTime,
+    totalRestTimeSpent
   ]);
 
+
+  // ── Check if workout already done today ──
+  useEffect(() => {
+    setTodayWorkouts(getWorkoutsByDate(getToday()));
+  }, [mode]);
 
   // ── Timer logic — only depend on isResting and timerPaused ──
   useEffect(() => {
     if (isResting && !timerPaused) {
       timerRef.current = setInterval(() => {
+        setTotalRestTimeSpent(prevSpent => prevSpent + 1);
         setRestTime(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -261,6 +281,7 @@ function Workout() {
     setWorkoutLog([]);
     setPrsHit([]);
     setWorkoutStartTime(Date.now());
+    setTotalRestTimeSpent(0);
     const firstEx = template.exercises[0];
     setWeightInput(getExerciseWeight(firstEx.exerciseId, firstEx.weight).toString());
     setRepsInput(firstEx.reps.toString());
@@ -342,13 +363,32 @@ function Workout() {
   };
 
   const finishWorkout = () => {
-    const duration = Math.round((Date.now() - workoutStartTime) / 1000 / 60);
-    setCompletionDuration(duration);
+    clearInterval(timerRef.current);
+    setIsResting(false);
+    setRestTime(0);
+
+    const totalDurationSecs = Math.round((Date.now() - workoutStartTime) / 1000);
+    const totalRestSecs = totalRestTimeSpent;
+    const totalExerciseSecs = Math.max(0, totalDurationSecs - totalRestSecs);
+    
+    const settings = getSettings();
+    const userWeight = parseFloat(settings.weightKg) || 70;
+    const caloriesBurnt = Math.round(5.0 * 3.5 * userWeight / 200 * (totalDurationSecs / 60));
+    
+    setCompletionDuration(Math.round(totalDurationSecs / 60));
+    setCompletionStats({
+      actualSets: workoutLog.length,
+      totalDurationSecs,
+      totalRestSecs,
+      totalExerciseSecs,
+      caloriesBurnt
+    });
+    
     saveWorkoutLog({
       type: workoutType,
       templateName: template.name,
       sets: workoutLog,
-      duration,
+      duration: Math.round(totalDurationSecs / 60),
       date: getToday(),
     });
     setMode('complete');
@@ -388,6 +428,8 @@ function Workout() {
   };
 
   if (!template) return null;
+
+  const workoutDoneToday = todayWorkouts.length > 0;
 
   const timerProgress = restTotal > 0 ? ((restTotal - restTime) / restTotal) * 100 : 0;
   const circumference = 2 * Math.PI * 90;
@@ -452,38 +494,81 @@ function Workout() {
           <h1 style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
             Workout Complete
           </h1>
-          <p style={{ fontSize: 14, color: '#8E8E93', margin: '0 0 32px' }}>
-            {template.name}
+          <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 20px', fontWeight: '500' }}>
+            {template.name} · {Math.round(totalVolume)}kg total volume
           </p>
 
-          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <div style={{ flex: 1, backgroundColor: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 16, padding: '16px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)' }}>
-              <span style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', letterSpacing: '-0.02em' }}>{completionDuration}</span>
-              <span style={{ fontSize: 11, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>Minutes</span>
-            </div>
-            <div style={{ flex: 1, backgroundColor: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 16, padding: '16px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)' }}>
-              <span style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', letterSpacing: '-0.02em' }}>{totalSets}</span>
-              <span style={{ fontSize: 11, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>Sets</span>
-            </div>
-            <div style={{ flex: 1, backgroundColor: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 16, padding: '16px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)' }}>
-              <span style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', letterSpacing: '-0.02em' }}>{Math.round(totalVolume)}</span>
-              <span style={{ fontSize: 11, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>kg Volume</span>
-            </div>
-          </div>
-
-          {prsHit.length > 0 && (
-            <div style={{ marginBottom: 24, padding: 16, backgroundColor: '#FFF9E6', border: '1px solid #FFEAA7', borderRadius: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: '700', color: '#B7791F', margin: '0 0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <Trophy size={16} strokeWidth={2.2} style={{ color: '#FF9500' }} />
-                New Personal Records!
-              </h3>
-              {prsHit.map((pr, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '6px 0', fontSize: 13, fontWeight: '600', color: '#744210' }}>
-                  <span>{pr.name}: {pr.weight}kg × {pr.reps} reps</span>
+          {/* Premium Visual Stats Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 12,
+            marginBottom: 28,
+            textAlign: 'left'
+          }}>
+            {[
+              {
+                label: 'Sets Done',
+                value: `${completionStats.actualSets} sets`,
+                icon: <Check size={18} strokeWidth={2.4} color="#34C759" />,
+                color: 'rgba(52,199,89,0.06)'
+              },
+              {
+                label: 'Exercise Time',
+                value: (() => {
+                  const mins = Math.floor(completionStats.totalExerciseSecs / 60);
+                  const secs = completionStats.totalExerciseSecs % 60;
+                  return mins === 0 ? `${secs}s` : `${mins}m ${secs}s`;
+                })(),
+                icon: <Dumbbell size={18} strokeWidth={2.4} color="#007AFF" />,
+                color: 'rgba(0,122,255,0.06)'
+              },
+              {
+                label: 'Rest Time',
+                value: (() => {
+                  const mins = Math.floor(completionStats.totalRestSecs / 60);
+                  const secs = completionStats.totalRestSecs % 60;
+                  return mins === 0 ? `${secs}s` : `${mins}m ${secs}s`;
+                })(),
+                icon: <Timer size={18} strokeWidth={2.4} color="#FF9500" />,
+                color: 'rgba(255,149,0,0.06)'
+              },
+              {
+                label: 'Est. Calories',
+                value: `${completionStats.caloriesBurnt} kcal`,
+                icon: <Zap size={18} strokeWidth={2.4} color="#FF3B30" />,
+                color: 'rgba(255,59,48,0.06)'
+              }
+            ].map((stat, i) => (
+              <div key={i} style={{
+                padding: 16,
+                background: '#FFFFFF',
+                border: '1px solid #E5E5EA',
+                borderRadius: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.02)'
+              }}>
+                <div style={{
+                  background: stat.color,
+                  borderRadius: '50%',
+                  width: 36,
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {stat.icon}
                 </div>
-              ))}
-            </div>
-          )}
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ fontSize: 10, color: '#8E8E93', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stat.label}</span>
+                  <span style={{ fontSize: 15, fontWeight: '700', color: '#1C1C1E', marginTop: 2 }}>{stat.value}</span>
+                </div>
+              </div>
+            ))}
+          </div>
 
           <div style={{ textAlign: 'left', marginBottom: 32 }}>
             <h3 style={{ fontSize: 14, fontWeight: '700', color: '#1C1C1E', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
@@ -492,23 +577,42 @@ function Workout() {
             {template.exercises.map((exT, idx) => {
               const ex = exercises[exT.exerciseId];
               const sets = workoutLog.filter(l => l.exerciseId === exT.exerciseId);
+              const prHit = prsHit.find(p => p.name === ex.nameShort);
+              let exerciseDuration = null;
+              if (sets.length >= 2) {
+                const first = new Date(sets[0].timestamp).getTime();
+                const last = new Date(sets[sets.length - 1].timestamp).getTime();
+                exerciseDuration = Math.round((last - first) / 60000);
+              }
               return (
                 <div 
                   key={idx} 
                   style={{
                     backgroundColor: '#FFFFFF',
-                    border: '1px solid #E5E5EA',
+                    border: prHit ? '1.5px solid #FFE082' : '1px solid #E5E5EA',
                     borderRadius: 14,
                     padding: '14px 16px',
                     marginBottom: 10,
                     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <div style={{ color: '#636366' }}>
-                      {getExerciseIcon(exT.exerciseId, 16)}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ color: '#636366' }}>
+                        {getExerciseIcon(exT.exerciseId, 16)}
+                      </div>
+                      <span style={{ fontSize: 14, fontWeight: '700', color: '#1C1C1E' }}>{ex.nameShort}</span>
                     </div>
-                    <span style={{ fontSize: 14, fontWeight: '700', color: '#1C1C1E' }}>{ex.nameShort}</span>
+                    {prHit && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        backgroundColor: '#FFF9E6', border: '1px solid #FFE082',
+                        color: '#B78103', padding: '2px 8px', borderRadius: 8,
+                        fontSize: 10, fontWeight: '700', letterSpacing: '0.3px'
+                      }}>
+                        <Trophy size={10} strokeWidth={2.5} /> PR
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {sets.map((s, si) => (
@@ -527,32 +631,100 @@ function Workout() {
                       </span>
                     ))}
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, paddingTop: 8, borderTop: '1px solid #F2F2F7' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8E8E93', fontWeight: '600' }}>
+                      <Timer size={11} strokeWidth={2.2} /> {exT.restMinutes}m rest
+                    </span>
+                    {exerciseDuration !== null && exerciseDuration > 0 && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8E8E93', fontWeight: '600' }}>
+                        <Dumbbell size={11} strokeWidth={2.2} /> ~{exerciseDuration} min
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          <button 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              padding: '16px',
-              border: 'none',
-              borderRadius: 14,
-              backgroundColor: '#1C1C1E',
-              color: '#FFFFFF',
-              fontSize: 16,
-              fontWeight: '600',
-              cursor: 'pointer',
-              minHeight: 52,
-              fontFamily: 'inherit'
-            }}
-            onClick={() => { setMode('plan'); window.scrollTo(0, 0); }}
-          >
-            Back to Plan
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                padding: '16px',
+                border: 'none',
+                borderRadius: 14,
+                backgroundColor: '#1C1C1E',
+                color: '#FFFFFF',
+                fontSize: 16,
+                fontWeight: '600',
+                cursor: 'pointer',
+                minHeight: 52,
+                fontFamily: 'inherit'
+              }}
+              onClick={() => { setMode('plan'); window.scrollTo(0, 0); }}
+            >
+              Back to Plan
+            </button>
+            <button 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '16px',
+                border: '1.5px solid #FF9500',
+                borderRadius: 14,
+                backgroundColor: '#FFFAF0',
+                color: '#E67E22',
+                fontSize: 16,
+                fontWeight: '600',
+                cursor: 'pointer',
+                minHeight: 52,
+                fontFamily: 'inherit'
+              }}
+              onClick={() => setShowGoAgainWarning(true)}
+            >
+              <RotateCcw size={18} strokeWidth={2.2} style={{ color: '#FF9500' }} />
+              Go Again!
+            </button>
+          </div>
+
+          {/* Go Again Warning Modal */}
+          <Modal isOpen={showGoAgainWarning} onClose={() => setShowGoAgainWarning(false)} type="centered-alert">
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%',
+              backgroundColor: '#FFF5EB',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <AlertTriangle size={26} strokeWidth={2.2} style={{ color: '#FF9500' }} />
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 8px', letterSpacing: '-0.01em' }}>
+              Train Again Today?
+            </h3>
+            <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 24px', lineHeight: '1.5' }}>
+              You've already completed a workout today. Training the same muscle groups again increases injury risk and may hinder recovery. Only proceed if targeting different muscles or doing a light session.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                className="btn btn-secondary w-full"
+                onClick={() => setShowGoAgainWarning(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary w-full"
+                style={{ backgroundColor: '#FF9500' }}
+                onClick={() => { setShowGoAgainWarning(false); startWorkout(); }}
+              >
+                Start Anyway
+              </button>
+            </div>
+          </Modal>
         </div>
       </div>
     );
@@ -567,6 +739,7 @@ function Workout() {
     const minSets = exTemplate.minSets || exTemplate.sets || 3;
     const maxSets = exTemplate.maxSets || minSets;
     const isAmrap = exTemplate.amrap && (currentSet >= minSets);
+    const isLastExercise = currentExIdx === template.exercises.length - 1;
     const weight = parseFloat(weightInput) || 0;
     const reps = parseInt(repsInput) || 0;
     const isInputValid = weight > 0 && reps > 0;
@@ -888,8 +1061,17 @@ function Workout() {
                   }}
                   onClick={advanceToNextExercise}
                 >
-                  <ChevronDown size={16} strokeWidth={2.2} />
-                  Next Exercise
+                  {isLastExercise ? (
+                    <>
+                      <Check size={16} strokeWidth={2.2} />
+                      Finish Workout
+                    </>
+                  ) : (
+                    <>
+                      Next Exercise
+                      <ChevronRight size={16} strokeWidth={2.2} />
+                    </>
+                  )}
                 </button>
                 {currentSet < maxSets && (
                   <button
@@ -912,7 +1094,7 @@ function Workout() {
                     onClick={doOneMoreSet}
                   >
                     <Plus size={16} strokeWidth={2.2} />
-                    +1 Set
+                    1 Set
                   </button>
                 )}
               </div>
@@ -974,83 +1156,26 @@ function Workout() {
           </button>
 
           {/* Cancel confirmation dialog */}
-          {showCancelConfirm && (
-            <div 
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                zIndex: 1000,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 20,
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)'
-              }}
-              onClick={() => setShowCancelConfirm(false)}
-            >
-              <div 
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 18,
-                  border: '1px solid #E5E5EA',
-                  padding: 24,
-                  width: '100%',
-                  maxWidth: 320,
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                  textAlign: 'center'
-                }} 
-                onClick={e => e.stopPropagation()}
+          <Modal isOpen={showCancelConfirm} onClose={() => setShowCancelConfirm(false)} type="centered-alert">
+            <h3 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 8px', letterSpacing: '-0.01em' }}>Cancel Workout?</h3>
+            <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 20px', lineHeight: '1.4' }}>
+              Your progress for this session will be lost.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                className="btn btn-danger w-full"
+                onClick={cancelWorkout}
               >
-                <h3 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 8px' }}>Cancel Workout?</h3>
-                <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 20px', lineHeight: '1.4' }}>
-                  Your progress for this session will be lost.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <button
-                    className="btn btn-secondary cancel-confirm-btn"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: 12,
-                      border: '1px solid #E5E5EA',
-                      backgroundColor: '#FFFFFF',
-                      color: '#1C1C1E',
-                      fontSize: 14,
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit'
-                    }}
-                    onClick={() => setShowCancelConfirm(false)}
-                  >
-                    Keep Going
-                  </button>
-                  <button
-                    className="btn btn-danger cancel-confirm-btn"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: 12,
-                      border: 'none',
-                      backgroundColor: '#FF3B30',
-                      color: '#FFFFFF',
-                      fontSize: 14,
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit'
-                    }}
-                    onClick={cancelWorkout}
-                  >
-                    Cancel Workout
-                  </button>
-                </div>
-              </div>
+                Yes, Cancel
+              </button>
+              <button
+                className="btn btn-secondary w-full"
+                onClick={() => setShowCancelConfirm(false)}
+              >
+                No, Continue
+              </button>
             </div>
-          )}
+          </Modal>
         </div>
       </div>
     );
@@ -1127,6 +1252,37 @@ function Workout() {
           )}
         </div>
       </div>
+
+      {/* Workout Completed Banner */}
+      {workoutDoneToday && (
+        <div 
+          style={{
+            backgroundColor: '#E8F5E9',
+            border: '1px solid #C8E6C9',
+            borderRadius: 14,
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: 16
+          }}
+        >
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%',
+            backgroundColor: '#FFFFFF', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}>
+            <Check size={18} strokeWidth={2.5} style={{ color: '#2E7D32' }} />
+          </div>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: '700', color: '#2E7D32', display: 'block' }}>Today's Workout Complete</span>
+            <span style={{ fontSize: 12, color: '#4CAF50', fontWeight: '500' }}>
+              {todayWorkouts.length} session{todayWorkouts.length > 1 ? 's' : ''} logged today
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Warm-up Section */}
       <div 
@@ -1562,7 +1718,7 @@ function Workout() {
         )}
       </div>
 
-      {/* Start Workout Button */}
+      {/* Start Workout / Go Again Button */}
       <button 
         style={{
           display: 'flex',
@@ -1571,10 +1727,10 @@ function Workout() {
           gap: 8,
           width: '100%',
           padding: '16px',
-          border: '1px solid #E5E5EA',
+          border: workoutDoneToday ? '1.5px solid #FF9500' : '1px solid #E5E5EA',
           borderRadius: 14,
-          backgroundColor: '#FFFFFF',
-          color: '#1C1C1E',
+          backgroundColor: workoutDoneToday ? '#FFFAF0' : '#FFFFFF',
+          color: workoutDoneToday ? '#E67E22' : '#1C1C1E',
           fontSize: 16,
           fontWeight: '600',
           cursor: 'pointer',
@@ -1584,11 +1740,53 @@ function Workout() {
           marginTop: 24,
           fontFamily: 'inherit'
         }}
-        onClick={startWorkout}
+        onClick={workoutDoneToday ? () => setShowGoAgainWarning(true) : startWorkout}
       >
-        <Play size={18} strokeWidth={2.2} style={{ color: '#007AFF' }} />
-        Start Workout
+        {workoutDoneToday ? (
+          <>
+            <RotateCcw size={18} strokeWidth={2.2} style={{ color: '#FF9500' }} />
+            Go Again!
+          </>
+        ) : (
+          <>
+            <Play size={18} strokeWidth={2.2} style={{ color: '#007AFF' }} />
+            Start Workout
+          </>
+        )}
       </button>
+
+      {/* Go Again Warning Modal */}
+      <Modal isOpen={showGoAgainWarning} onClose={() => setShowGoAgainWarning(false)} type="centered-alert">
+        <div style={{
+          width: 52, height: 52, borderRadius: '50%',
+          backgroundColor: '#FFF5EB',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 16px'
+        }}>
+          <AlertTriangle size={26} strokeWidth={2.2} style={{ color: '#FF9500' }} />
+        </div>
+        <h3 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 8px', letterSpacing: '-0.01em' }}>
+          Train Again Today?
+        </h3>
+        <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 24px', lineHeight: '1.5' }}>
+          You've already completed a workout today. Training the same muscle groups again increases injury risk and may hinder recovery. Only proceed if targeting different muscles or doing a light session.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button
+            className="btn btn-secondary w-full"
+            onClick={() => setShowGoAgainWarning(false)}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary w-full"
+            style={{ backgroundColor: '#FF9500' }}
+            onClick={() => { setShowGoAgainWarning(false); startWorkout(); }}
+          >
+            Start Anyway
+          </button>
+        </div>
+      </Modal>
 
       {/* Bottom spacer for nav */}
       <div className="bottom-spacer" style={{ height: 24 }} />

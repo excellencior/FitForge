@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDailyTotals, getCurrentWeekInCycle, getTodayWorkoutType, getToday, getWorkoutsByDate, getSettings, getWorkoutLogs, getActiveSheet } from '../utils/storage';
+import { getDailyTotals, getCurrentWeekInCycle, getTodayWorkoutType, getToday, getWorkoutsByDate, getSettings, getWorkoutLogs, getActiveSheet, getDeloadTracker } from '../utils/storage';
 import { workoutTemplates } from '../data/workouts';
 import { useNavigate } from 'react-router-dom';
 import { Dumbbell, Target, ChevronRight, Settings, Zap, CalendarCheck, Award, Sparkles, TrendingUp, Cookie, Sun, CloudSun, Moon } from 'lucide-react';
@@ -347,41 +347,67 @@ export default function Dashboard() {
           Week {cycleInfo.currentWeek} of 7 · Cycle {cycleInfo.completedCycles + 1}
         </p>
         <div style={styles.weekRow}>
-          {[1, 2, 3, 4, 5, 6, 7].map((w) => {
-            const isPast = w < cycleInfo.currentWeek;
-            const isCurrent = w === cycleInfo.currentWeek;
-            const isDeload = w === 7;
+          {(() => {
+            const workoutLogs = getWorkoutLogs();
+            const tracker = getDeloadTracker();
+            const start = new Date(tracker.startDate);
+            start.setHours(0, 0, 0, 0);
 
-            let dotBg = '#F2F2F7';
-            let textColor = '#AEAEB2';
-            let border = '1px solid transparent';
+            return [1, 2, 3, 4, 5, 6, 7].map((w) => {
+              const isPast = w < cycleInfo.currentWeek;
+              const isCurrent = w === cycleInfo.currentWeek;
+              const isDeload = w === 7;
 
-            if (isPast) {
-              dotBg = '#E8F0FE';
-              textColor = '#007AFF';
-            } else if (isCurrent) {
-              dotBg = isDeload ? '#FFF3E0' : '#EDE7F6';
-              textColor = isDeload ? '#FF9500' : '#5856D6';
-              border = `1.5px solid ${isDeload ? '#FF9500' : '#5856D6'}`;
-            }
+              let dotBg = '#F2F2F7';
+              let textColor = '#AEAEB2';
+              let border = '1px solid transparent';
 
-            return (
-              <div
-                key={w}
-                style={{
-                  ...styles.weekDot,
-                  backgroundColor: dotBg,
-                  border: border,
-                }}
-              >
-                <span style={{
-                  ...styles.weekNum,
-                  color: textColor,
-                  fontWeight: isCurrent ? '700' : '600',
-                }}>{w}</span>
-              </div>
-            );
-          })}
+              if (isPast) {
+                dotBg = '#E8F0FE';
+                textColor = '#007AFF';
+              } else if (isCurrent) {
+                dotBg = isDeload ? '#FFF3E0' : '#EDE7F6';
+                textColor = isDeload ? '#FF9500' : '#5856D6';
+                border = `1.5px solid ${isDeload ? '#FF9500' : '#5856D6'}`;
+              }
+
+              const weekStart = new Date(start.getTime() + (w - 1) * 7 * 24 * 60 * 60 * 1000);
+              const weekEnd = new Date(start.getTime() + w * 7 * 24 * 60 * 60 * 1000);
+              
+              const hasWorkout = workoutLogs.some(log => {
+                const logDate = new Date(log.date);
+                logDate.setHours(0, 0, 0, 0);
+                return logDate >= weekStart && logDate < weekEnd;
+              });
+
+              return (
+                <div
+                  key={w}
+                  style={{
+                    ...styles.weekDot,
+                    backgroundColor: dotBg,
+                    border: border,
+                    position: 'relative',
+                  }}
+                >
+                  <span style={{
+                    ...styles.weekNum,
+                    color: textColor,
+                    fontWeight: isCurrent ? '700' : '600',
+                  }}>{w}</span>
+                  {hasWorkout && (
+                    <span style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -4,
+                      fontSize: 12,
+                      lineHeight: 1
+                    }}>🔥</span>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
         <div style={styles.weekLabels}>
           <span style={styles.weekLabelText}>Training</span>
