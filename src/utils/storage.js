@@ -27,16 +27,28 @@ function setItem(key, value) {
 
 // Date helpers
 export function getToday() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const r = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${r}`;
+}
+
+export function parseLocalDate(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 export function getWeekStart(date = new Date()) {
-  const d = new Date(date);
+  const d = typeof date === 'string' ? parseLocalDate(date) : new Date(date);
   const day = d.getDay();
   const diff = d.getDate() - day;
   d.setDate(diff);
   d.setHours(0, 0, 0, 0);
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 }
 
 // Workout Log
@@ -189,8 +201,10 @@ export function getDeloadTracker() {
 
 export function updateDeloadTracker() {
   const tracker = getDeloadTracker();
-  const start = new Date(tracker.startDate);
+  const start = parseLocalDate(tracker.startDate);
+  start.setHours(0, 0, 0, 0);
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const weeksDiff = Math.floor((now - start) / (7 * 24 * 60 * 60 * 1000));
   const cycleWeek = (weeksDiff % 7) + 1; // 6 training + 1 deload = 7 week cycle
   

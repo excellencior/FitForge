@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Plus, Search, X, Trash2, ChevronDown, ChevronUp, Droplets, AlertTriangle,
-  Sun, CloudSun, Moon, Cookie, Zap, Circle, Star, Check, ChevronLeft, ChevronRight
+  Sun, CloudSun, Moon, Cookie, Circle, Star, Check, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import foods, { foodCategories } from '../data/foods';
+import logo from '../assets/fitforge_logo.png';
 import { getDietByDate, saveDietLog, removeDietEntry, getToday, getSettings, getDietLogs } from '../utils/storage';
 import { useModalLock, useInputFocus, useDebounce, useToast } from '../utils/ux';
 
@@ -162,6 +163,52 @@ export default function Diet() {
     setLastWaterIdx(-1);
   }, [date]);
 
+  /* Quick Add Favorites: dynamically computed from log history */
+  const favorites = useMemo(() => {
+    const logs = getDietLogs();
+    const counts = {};
+    if (entries) {
+      logs.forEach(log => {
+        if (log.foodId) {
+          counts[log.foodId] = (counts[log.foodId] || 0) + 1;
+        }
+      });
+    }
+    const sortedIds = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const topFoods = sortedIds
+      .slice(0, 5)
+      .map(id => foods.find(f => f.id === Number(id)))
+      .filter(Boolean);
+
+    // Seed default popular items if no entries are found
+    if (topFoods.length === 0) {
+      const seedIds = [31, 1, 23, 59]; // Boiled Egg, White Rice, Chicken Breast, Banana
+      return seedIds.map(id => foods.find(f => f.id === id)).filter(Boolean);
+    }
+    return topFoods;
+  }, [entries]);
+
+  const handleQuickAdd = useCallback((food) => {
+    if (!debounceAdd()) return;
+    const meal = detectMeal();
+    const entry = {
+      foodId: food.id,
+      name: food.name,
+      namebn: food.namebn,
+      meal,
+      serving: food.serving,
+      multiplier: 1,
+      calories: Math.round(food.calories),
+      protein: Math.round(food.protein * 10) / 10,
+      carbs: Math.round(food.carbs * 10) / 10,
+      fat: Math.round(food.fat * 10) / 10,
+      date,
+    };
+    saveDietLog(entry);
+    setEntries(getDietByDate(date));
+    showToast(`Added ${food.namebn || food.name} to ${meal.charAt(0).toUpperCase() + meal.slice(1)}`);
+  }, [date, debounceAdd, showToast]);
+
   /* computed totals */
   const totals = useMemo(() => entries.reduce((a, e) => ({
     calories: a.calories + (e.calories || 0),
@@ -272,6 +319,18 @@ export default function Diet() {
   return (
     <div className="page-content" style={s.page}>
 
+      {/* ───── Header Top Bar ───── */}
+      <div style={s.headerTopBar}>
+        <h1 style={s.pageTitle}>Diet Tracker</h1>
+        <div style={s.logoContainer}>
+          <img
+            src={logo}
+            alt="FitForge"
+            style={s.logoImage}
+          />
+        </div>
+      </div>
+
       {/* ── Toast Notification (positioned elegantly above bottom navigation) ── */}
       {toast && (
         <div key={toast.id} style={s.toast}>
@@ -354,7 +413,25 @@ export default function Diet() {
         </div>
       </div>
 
-
+      {/* ── Quick Add Favorites ── */}
+      <div style={s.favSection}>
+        <div style={s.sectionTitle}>
+          <span style={s.sectionTitleIcon}><Star size={13} fill="#FF9500" color="#FF9500" /></span>
+          Frequently Logged (Quick Add)
+        </div>
+        <div style={s.favChips}>
+          {favorites.map(food => (
+            <button
+              key={food.id}
+              style={s.favChip}
+              onClick={() => handleQuickAdd(food)}
+            >
+              <span style={s.favName}>{food.namebn || food.name}</span>
+              <span style={s.favCal}>{food.calories} kcal</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ── Meal Cards ── */}
       <div style={s.mealList}>
@@ -766,6 +843,40 @@ const s = {
     borderRadius: 10,
     letterSpacing: '0.4px',
     textTransform: 'uppercase',
+  },
+
+  /* ── Premium Header Top Bar ── */
+  headerTopBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingTop: 8,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    margin: 0,
+    letterSpacing: '-0.04em',
+    lineHeight: 1.2,
+  },
+  logoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    overflow: 'hidden',
+    border: '1.5px solid #E5E5EA',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#FFFFFF',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
   },
 
   /* ── Daily Summary Card ── */

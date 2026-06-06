@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getDailyTotals, getCurrentWeekInCycle, getTodayWorkoutType, getToday, getWorkoutsByDate, getSettings, getWorkoutLogs, getActiveSheet, getDeloadTracker } from '../utils/storage';
 import { workoutTemplates } from '../data/workouts';
 import { useNavigate } from 'react-router-dom';
-import { Dumbbell, Target, ChevronRight, Settings, Zap, CalendarCheck, Award, Sparkles, TrendingUp, Cookie, Sun, CloudSun, Moon } from 'lucide-react';
+import { Dumbbell, Target, ChevronRight, Settings, Zap, CalendarCheck, Award, Sparkles, TrendingUp, Cookie, Droplets } from 'lucide-react';
 import logo from '../assets/fitforge_logo.png';
 
 const safetyTips = [
@@ -70,10 +70,9 @@ function CalorieRing({ consumed, target }) {
             r={normalizedRadius}
             cx={radius}
             cy={radius}
+            transform="rotate(-90 70 70)"
             style={{
               transition: 'stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease',
-              transform: 'rotate(-90deg)',
-              transformOrigin: '50% 50%',
             }}
           />
         </svg>
@@ -213,11 +212,12 @@ export default function Dashboard() {
           <div
             role="status"
             aria-label={`Total workout days: ${totalDays}`}
+            style={styles.daysBadge}
           >
-            <div style={styles.calendarMiniIcon}>
-              <div style={styles.calendarMiniHeader} />
-              <span style={styles.calendarMiniDay}>{totalDays}</span>
-            </div>
+            <CalendarCheck size={16} color="#FF3B30" strokeWidth={2.2} />
+            <span style={{ fontSize: 13, fontWeight: '700', color: '#1C1C1E' }}>
+              {totalDays} {totalDays === 1 ? 'day' : 'days'}
+            </span>
           </div>
           <button
             onClick={() => navigate('/profile')}
@@ -289,9 +289,9 @@ export default function Dashboard() {
           Macronutrients
         </h2>
         <div style={styles.macroCardStacked}>
-          <MacroRow label="Protein" current={totals.protein} target={settings.proteinTarget || 160} color="#007AFF" icon={Sun} />
-          <MacroRow label="Carbohydrates" current={totals.carbs} target={settings.carbsTarget || 360} color="#FF9500" icon={CloudSun} />
-          <MacroRow label="Fats" current={totals.fat} target={settings.fatTarget || 80} color="#FF3B30" icon={Moon} />
+          <MacroRow label="Protein" current={totals.protein} target={settings.proteinTarget || 160} color="#007AFF" icon={Zap} />
+          <MacroRow label="Carbohydrates" current={totals.carbs} target={settings.carbsTarget || 360} color="#FF9500" icon={Cookie} />
+          <MacroRow label="Fats" current={totals.fat} target={settings.fatTarget || 80} color="#FF3B30" icon={Droplets} />
         </div>
       </section>
 
@@ -351,7 +351,8 @@ export default function Dashboard() {
           {(() => {
             const workoutLogs = getWorkoutLogs();
             const tracker = getDeloadTracker();
-            const start = new Date(tracker.startDate);
+            const [sy, sm, sd] = tracker.startDate.split('-').map(Number);
+            const start = new Date(sy, sm - 1, sd);
             start.setHours(0, 0, 0, 0);
 
             return [1, 2, 3, 4, 5, 6, 7].map((w) => {
@@ -376,7 +377,8 @@ export default function Dashboard() {
               const weekEnd = new Date(start.getTime() + w * 7 * 24 * 60 * 60 * 1000);
               
               const hasWorkout = workoutLogs.some(log => {
-                const logDate = new Date(log.date);
+                const [ly, lm, ld] = log.date.split('-').map(Number);
+                const logDate = new Date(ly, lm - 1, ld);
                 logDate.setHours(0, 0, 0, 0);
                 return logDate >= weekStart && logDate < weekEnd;
               });
@@ -401,18 +403,14 @@ export default function Dashboard() {
                     boxShadow: displayShadow,
                   }}
                 >
-                  {hasWorkout ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
-                      <span style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF', lineHeight: 1 }}>{w}</span>
-                      <span style={{ fontSize: 9, marginTop: 1, lineHeight: 1 }}>🔥</span>
-                    </div>
-                  ) : (
-                    <span style={{
-                      ...styles.weekNum,
-                      color: textColor,
-                      fontWeight: isCurrent ? '700' : '600',
-                    }}>{w}</span>
-                  )}
+                  <span style={{
+                    ...styles.weekNum,
+                    color: hasWorkout ? '#FFFFFF' : textColor,
+                    fontWeight: (isCurrent || hasWorkout) ? '800' : '600',
+                    fontSize: 13,
+                  }}>
+                    {w}
+                  </span>
                 </div>
               );
             });
@@ -933,12 +931,11 @@ const styles = {
   weekRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    gap: 6,
+    gap: 4,
   },
   weekDot: {
-    flex: 1,
-    aspectRatio: '1 / 1',
-    maxWidth: 44,
+    width: 32,
+    height: 32,
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
@@ -947,6 +944,7 @@ const styles = {
   },
   weekNum: {
     fontSize: 13,
+    lineHeight: 1,
   },
   weekLabels: {
     display: 'flex',
