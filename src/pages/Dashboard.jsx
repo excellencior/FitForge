@@ -23,7 +23,8 @@ function getGreeting() {
 }
 
 function formatDate(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
   return d.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',

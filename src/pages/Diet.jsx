@@ -61,14 +61,19 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
 
 /* ──────────────────── helpers ──────────────────── */
 const fmtDate = (d) => {
-  const date = new Date(d + 'T00:00:00');
+  const [year, month, day] = d.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   return date.toLocaleDateString('en-BD', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 };
 
 const shiftDate = (d, n) => {
-  const date = new Date(d + 'T00:00:00');
+  const [year, month, day] = d.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() + n);
-  return date.toISOString().split('T')[0];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 };
 
 /** Auto-detect meal based on current time of day */
