@@ -1243,21 +1243,7 @@ function Workout() {
         <h1 style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', margin: '0 0 6px', letterSpacing: '-0.02em' }}>{template.name}</h1>
         <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 12px', fontWeight: '500' }}>{todayFormatted()}</p>
         <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-          {usingActiveSheet ? (
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: '#E8F5E9',
-              color: '#2E7D32',
-              padding: '6px 14px',
-              borderRadius: 20,
-              fontSize: 12,
-              fontWeight: '600'
-            }}>
-              <Zap size={13} strokeWidth={2.5} /> Active Sheet
-            </span>
-          ) : (
+          {!usingActiveSheet && (
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
