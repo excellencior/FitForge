@@ -1,6 +1,6 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Dumbbell, UtensilsCrossed, TrendingUp, ClipboardList } from 'lucide-react';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Workout = lazy(() => import('./pages/Workout'));
@@ -34,6 +34,10 @@ const navItems = [
 
 export default function App() {
   const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   return (
     <div className="app-container">

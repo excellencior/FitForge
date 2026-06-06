@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import Modal from '../components/Modal';
 import {
   Plus, Search, X, Trash2, ChevronDown, ChevronUp, Droplets, AlertTriangle,
   Sun, CloudSun, Moon, Cookie, Zap, Circle, Star, Check, ChevronLeft, ChevronRight
@@ -13,14 +14,7 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
   const sheet = document.createElement('style');
   sheet.id = KEYFRAMES_ID;
   sheet.textContent = `
-    @keyframes dietModalSlideUp {
-      from { transform: translateY(100%) scale(0.97); opacity: 0; }
-      to   { transform: translateY(0) scale(1);       opacity: 1; }
-    }
-    @keyframes dietModalOverlayIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
+
     @keyframes dietToastSlideUp {
       from { transform: translateY(24px) scale(0.95); opacity: 0; }
       to   { transform: translateY(0) scale(1);       opacity: 1; }
@@ -464,23 +458,17 @@ export default function Diet() {
 
       {/* ── Floating Food Search Modal ── */}
       {modalOpen && (
-        <div
-          style={s.modalOverlay}
-          onClick={() => setModalOpen(false)}
-          role="dialog"
-          aria-modal="true"
+        <Modal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title={
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-blue)' }}>{MEAL_ICONS[modalMeal]}</span>
+              <span>Add to ${MEALS.find(m => m.key === modalMeal)?.label}</span>
+            </span>
+          }
+          type="bottom-sheet"
         >
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            {/* Modal Head */}
-            <div style={s.modalHead}>
-              <h2 style={s.modalTitle}>
-                <span style={s.modalTitleIcon}>{MEAL_ICONS[modalMeal]}</span>
-                Add to {MEALS.find(m => m.key === modalMeal)?.label}
-              </h2>
-              <button style={s.modalClose} onClick={() => setModalOpen(false)}>
-                <X size={20} strokeWidth={2.2} />
-              </button>
-            </div>
 
             {/* Search Box - no autofocus to prevent keyboard obstruction */}
             <div style={s.modalSearchWrap}>
@@ -641,9 +629,8 @@ export default function Diet() {
                 })
               )}
             </div>
-          </div>
-        </div>
-      )}
+          </Modal>
+        )}
     </div>
   );
 }
