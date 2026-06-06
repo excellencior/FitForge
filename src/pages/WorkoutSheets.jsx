@@ -34,6 +34,48 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
       0%   { opacity: 0; transform: translateY(-8px) scale(0.98); }
       100% { opacity: 1; transform: translateY(0) scale(1); }
     }
+    @keyframes sheetsContentExpand {
+      0%   { opacity: 0; transform: translateY(-10px); max-height: 0; margin-top: 0; padding-top: 0; overflow: hidden; }
+      100% { opacity: 1; transform: translateY(0); max-height: 1500px; margin-top: 16px; padding-top: 16px; }
+    }
+    @keyframes sheetsExConfigExpand {
+      0%   { opacity: 0; transform: translateY(-8px); max-height: 0; overflow: hidden; }
+      100% { opacity: 1; transform: translateY(0); max-height: 500px; }
+    }
+    .sheet-btn {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sheet-btn:active {
+      transform: scale(0.96);
+      opacity: 0.85;
+    }
+    .sheet-btn:disabled {
+      opacity: 0.4;
+      pointer-events: none;
+      transform: none !important;
+    }
+    .sheet-chip {
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sheet-chip:active {
+      transform: scale(0.92);
+    }
+    .modal-content::-webkit-scrollbar {
+      display: none !important;
+    }
+    .ios-form-row {
+      transition: background-color 0.2s ease;
+    }
+    .ios-form-row:focus-within {
+      background-color: #F9F9FC;
+    }
+    .ios-form-row:focus-within label {
+      color: #007AFF !important;
+    }
+    .ex-config-container {
+      animation: sheetsExConfigExpand 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      overflow: hidden;
+    }
   `;
   document.head.appendChild(sheet);
 }
@@ -61,18 +103,12 @@ const exerciseCatalog = Object.values(defaultExercises).map(ex => ({
  * Legs > Back > Chest > Shoulders > Arms > Core > Cardio
  */
 const EXERCISE_PRIORITY = {
-  // Tier 1: Primary barbell compounds
   squat: 10, deadlift: 11, bench: 12, ohp: 13,
   frontSquat: 14,
-  // Tier 2: Secondary compounds
   row: 20, pullup: 21, inclineBench: 22, romanianDL: 23,
-  // Tier 3: Machine/accessory compounds
   legPress: 30, latPull: 31, tricepDip: 32,
-  // Tier 4: Isolation
   legCurl: 40, shoulderRaise: 41, facePull: 42, curl: 43, calfRaise: 44,
-  // Tier 5: Core
   plank: 50,
-  // Tier 6: Conditioning (always last)
   kbSwing: 60, farmerWalk: 61, jumpRope: 62, bwCircuit: 63,
 };
 
@@ -83,7 +119,7 @@ const TIER_LABELS = {
 
 const getTier = (exId) => {
   const p = EXERCISE_PRIORITY[exId];
-  if (!p) return 4; // unknown → isolation
+  if (!p) return 4;
   return Math.floor(p / 10);
 };
 
@@ -131,7 +167,6 @@ export default function WorkoutSheets() {
   const handleFocus = useInputFocus();
   const { toast, show: showToast } = useToast();
 
-  // Lock body scroll when any modal is open
   useModalLock(showEditor || showCatalog || !!showDeleteConfirm);
 
   useEffect(() => {
@@ -140,7 +175,6 @@ export default function WorkoutSheets() {
 
   const loadData = () => {
     let loaded = getWorkoutSheets();
-    // Seed default sheets if empty
     if (loaded.length === 0) {
       defaultSheets.forEach(s => saveWorkoutSheet({ ...s }));
       loaded = getWorkoutSheets();
@@ -149,7 +183,6 @@ export default function WorkoutSheets() {
     setActive(getActiveSheet());
   };
 
-  /* ── Activation lock: once per day ── */
   const canChangeActive = () => {
     const lastChange = localStorage.getItem('fitforge_last_sheet_change');
     if (!lastChange) return true;
@@ -191,7 +224,6 @@ export default function WorkoutSheets() {
     }
     setTimeout(() => {
       deleteWorkoutSheet(sheetId);
-      // If we deleted the active sheet, fall back to the default or first available
       if (activeSheet?.id === sheetId) {
         const remaining = getWorkoutSheets();
         const defaultSheet = remaining.find(s => s.isDefault) || remaining[0];
@@ -210,7 +242,6 @@ export default function WorkoutSheets() {
   };
 
   const handleSetDefault = (sheet) => {
-    // Remove default from all, set on this one
     const all = getWorkoutSheets();
     all.forEach(s => {
       if (s.isDefault) saveWorkoutSheet({ ...s, isDefault: false });
@@ -328,10 +359,10 @@ export default function WorkoutSheets() {
     return item ? item.type : 'accessory';
   };
 
-  const renderExerciseIcon = (type, size = 16) => {
-    if (type === 'compound') return <Dumbbell size={size} strokeWidth={2.4} color="#1C1C1E" />;
-    if (type === 'conditioning') return <Zap size={size} strokeWidth={2.4} color="#1C1C1E" />;
-    return <Sparkles size={size} strokeWidth={2.4} color="#1C1C1E" />;
+  const renderExerciseIcon = (type, size = 16, color = "#1C1C1E") => {
+    if (type === 'compound') return <Dumbbell size={size} strokeWidth={2.4} color={color} />;
+    if (type === 'conditioning') return <Zap size={size} strokeWidth={2.4} color={color} />;
+    return <Sparkles size={size} strokeWidth={2.4} color={color} />;
   };
 
   const getAreaOrMuscleMatch = (ex, filter) => {
@@ -405,32 +436,153 @@ export default function WorkoutSheets() {
 
       {/* Active Sheet Banner */}
       {activeSheet && (
-        <div style={{
-          marginBottom: 20, 
-          padding: '14px 16px', 
-          borderRadius: '16px',
-          background: '#F2F2F7', 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 12,
-          border: '1px solid #E5E5EA',
-        }}>
-          <div style={{
-            width: 34,
-            height: 34,
-            borderRadius: '10px',
-            background: '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-          }}>
-            <Zap size={18} strokeWidth={2.4} color="#1C1C1E" />
+        <div 
+          className="sheet-btn"
+          style={{
+            marginBottom: 20, 
+            padding: '16px 20px', 
+            borderRadius: '18px',
+            background: 'linear-gradient(135deg, #007AFF, #5856D6)', 
+            display: 'flex', 
+            flexDirection: 'column',
+            boxShadow: '0 8px 24px rgba(88, 86, 214, 0.15)',
+            cursor: 'pointer',
+          }}
+          onClick={() => setExpandedSheet(expandedSheet === activeSheet.id ? null : activeSheet.id)}
+        >
+          {/* Banner Header Row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%' }}>
+            <div style={{
+              width: 38,
+              height: 38,
+              borderRadius: '12px',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Zap size={20} strokeWidth={2.4} color="#FFFFFF" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255, 255, 255, 0.8)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Currently Active Plan</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF', marginTop: 1, letterSpacing: '-0.01em' }}>{activeSheet.name}</div>
+            </div>
+            <div style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {expandedSheet === activeSheet.id ? (
+                <ChevronUp size={14} strokeWidth={2.4} color="#FFFFFF" />
+              ) : (
+                <ChevronDown size={14} strokeWidth={2.4} color="#FFFFFF" />
+              )}
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Currently Active</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#1C1C1E', marginTop: 1 }}>{activeSheet.name}</div>
-          </div>
+
+          {/* Expanded Banner Content */}
+          {expandedSheet === activeSheet.id && (
+            <div 
+              style={{
+                borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+                marginTop: 14,
+                paddingTop: 14,
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                animation: 'sheetsContentExpand 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                overflow: 'hidden',
+              }}
+              onClick={e => e.stopPropagation()} // Prevent collapsing banner when clicking inside
+            >
+              {activeSheet.description && (
+                <div style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.9)', lineHeight: 1.45 }}>
+                  {activeSheet.description}
+                </div>
+              )}
+
+              {/* Exercise List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {activeSheet.exercises?.map((ex, i) => {
+                  const info = getExerciseInfo(ex.exerciseId);
+                  const type = getExerciseType(ex.exerciseId);
+                  return (
+                    <div key={i} style={{
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 12,
+                      padding: '10px 12px', 
+                      background: 'rgba(255, 255, 255, 0.12)', 
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                    }}>
+                      <div style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '8px',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        {renderExerciseIcon(type, 14, "#FFFFFF")}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#FFFFFF' }}>{info.name}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.7)', marginTop: 2 }}>
+                          {ex.minSets || ex.sets || 3}{ex.maxSets ? `-${ex.maxSets}` : ''} × {ex.reps}{ex.amrap ? '+' : ''} · {ex.weight > 0 ? `${ex.weight}kg` : 'No weight'} · Rest {ex.restMinutes}m
+                        </div>
+                      </div>
+                      {ex.amrap && (
+                        <span style={{ 
+                          fontSize: 8, 
+                          fontWeight: 700, 
+                          background: 'rgba(255, 255, 255, 0.2)', 
+                          color: '#FFFFFF', 
+                          padding: '2px 6px', 
+                          borderRadius: '100px', 
+                          letterSpacing: '0.03em' 
+                        }}>
+                          AMRAP
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Deactivate Button inside banner */}
+              <button 
+                className="sheet-btn"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: 6,
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  width: '100%',
+                }} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeactivate();
+                }}
+              >
+                <RotateCcw size={14} strokeWidth={2.4} /> Deactivate Plan
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -499,9 +651,13 @@ export default function WorkoutSheets() {
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #E5E5EA' }}>
+                <div style={{
+                  borderTop: '1px solid #E5E5EA',
+                  animation: 'sheetsContentExpand 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                  overflow: 'hidden',
+                }}>
                   {sheet.description && (
-                    <div style={{ fontSize: 13, color: '#636366', marginBottom: 14, lineHeight: 1.4 }}>{sheet.description}</div>
+                    <div style={{ fontSize: 13, color: '#636366', marginBottom: 14, lineHeight: 1.45 }}>{sheet.description}</div>
                   )}
 
                   {/* Exercise List */}
@@ -514,10 +670,10 @@ export default function WorkoutSheets() {
                           display: 'flex', 
                           alignItems: 'center', 
                           gap: 12,
-                          padding: '10px 12px', 
-                          background: '#F2F2F7', 
-                          borderRadius: '12px',
-                          border: '1px solid #E5E5EA',
+                          padding: '12px 14px', 
+                          background: isActive ? '#FFFFFF' : '#F8F9FA', 
+                          borderRadius: '14px',
+                          border: isActive ? '1px solid #D0E5FF' : '1px solid #E5E5EA',
                         }}>
                           <div style={{
                             width: 32,
@@ -559,13 +715,14 @@ export default function WorkoutSheets() {
                   <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
                     {!isActive ? (
                       <button 
+                        className="sheet-btn"
                         style={{ 
                           flex: 1.5, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center', 
                           gap: 6,
-                          background: '#1C1C1E',
+                          background: '#007AFF',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '12px',
@@ -580,15 +737,16 @@ export default function WorkoutSheets() {
                       </button>
                     ) : (
                       <button 
+                        className="sheet-btn"
                         style={{ 
                           flex: 1.5, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center', 
                           gap: 6,
-                          background: '#FFFFFF',
-                          color: '#E04F4F',
-                          border: '1px solid #E5E5EA',
+                          background: '#FFF0F0',
+                          color: '#FF3B30',
+                          border: '1px solid #FFD1D1',
                           borderRadius: '12px',
                           padding: '10px 16px',
                           fontSize: 13,
@@ -603,6 +761,7 @@ export default function WorkoutSheets() {
                     
                     {!sheet.isDefault && (
                       <button 
+                        className="sheet-btn"
                         style={{
                           width: 38,
                           height: 38,
@@ -622,6 +781,7 @@ export default function WorkoutSheets() {
                     )}
 
                     <button 
+                      className="sheet-btn"
                       style={{
                         width: 38,
                         height: 38,
@@ -640,6 +800,7 @@ export default function WorkoutSheets() {
 
                     {sheets.length > 1 && (
                       <button
+                        className="sheet-btn"
                         style={{ 
                           width: 38,
                           height: 38,
@@ -647,7 +808,7 @@ export default function WorkoutSheets() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           background: '#FFF0F0', 
-                          color: '#E04F4F',
+                          color: '#FF3B30',
                           border: '1px solid #FFD1D1',
                           borderRadius: '12px',
                           cursor: 'pointer',
@@ -667,6 +828,7 @@ export default function WorkoutSheets() {
 
       {/* Create New Sheet Button */}
       <button 
+        className="sheet-btn"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -682,7 +844,6 @@ export default function WorkoutSheets() {
           fontWeight: 600,
           cursor: 'pointer',
           boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-          transition: 'background-color 0.2s',
         }} 
         onClick={openNewSheet}
       >
@@ -701,18 +862,29 @@ export default function WorkoutSheets() {
           title={editingSheet.id ? 'Edit Sheet' : 'New Workout Sheet'}
           type="bottom-sheet"
         >
-
-            {/* Sheet Info */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Sheet Name *</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 16 }}>
+            {/* Sheet Info Card — iOS Settings Grouped Table Style */}
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '14px',
+              border: '1px solid #E5E5EA',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              overflow: 'hidden',
+            }}>
+              {/* Row 1: Name */}
+              <div className="ios-form-row" style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid #E5E5EA',
+              }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Sheet Name *</label>
                 <input
                   style={{
                     width: '100%',
-                    background: '#F2F2F7',
-                    border: '1px solid #E5E5EA',
-                    borderRadius: '12px',
-                    padding: '10px 14px',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '4px 0',
                     fontSize: 14,
                     color: '#1C1C1E',
                     outline: 'none',
@@ -721,17 +893,22 @@ export default function WorkoutSheets() {
                   placeholder="e.g. Upper Body Power"
                   value={editingSheet.name}
                   onChange={e => setEditingSheet(p => ({ ...p, name: e.target.value }))}
+                  onFocus={handleFocus}
                 />
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Description</label>
+
+              {/* Row 2: Description */}
+              <div className="ios-form-row" style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid #E5E5EA',
+              }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Description</label>
                 <input
                   style={{
                     width: '100%',
-                    background: '#F2F2F7',
-                    border: '1px solid #E5E5EA',
-                    borderRadius: '12px',
-                    padding: '10px 14px',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '4px 0',
                     fontSize: 14,
                     color: '#1C1C1E',
                     outline: 'none',
@@ -740,20 +917,25 @@ export default function WorkoutSheets() {
                   placeholder="Brief description (optional)"
                   value={editingSheet.description || ''}
                   onChange={e => setEditingSheet(p => ({ ...p, description: e.target.value }))}
+                  onFocus={handleFocus}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+
+              {/* Row 3: Grid of Dates */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                <div className="ios-form-row" style={{
+                  padding: '12px 16px',
+                  borderRight: '1px solid #E5E5EA',
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                     <Calendar size={11} strokeWidth={2.4} /> Start Date
                   </label>
                   <input
                     style={{
                       width: '100%',
-                      background: '#F2F2F7',
-                      border: '1px solid #E5E5EA',
-                      borderRadius: '12px',
-                      padding: '10px 12px',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '4px 0',
                       fontSize: 13,
                       color: '#1C1C1E',
                       outline: 'none',
@@ -765,17 +947,18 @@ export default function WorkoutSheets() {
                     onFocus={handleFocus}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                <div className="ios-form-row" style={{
+                  padding: '12px 16px',
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                     <Calendar size={11} strokeWidth={2.4} /> End Date
                   </label>
                   <input
                     style={{
                       width: '100%',
-                      background: '#F2F2F7',
-                      border: '1px solid #E5E5EA',
-                      borderRadius: '12px',
-                      padding: '10px 12px',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '4px 0',
                       fontSize: 13,
                       color: '#1C1C1E',
                       outline: 'none',
@@ -791,15 +974,16 @@ export default function WorkoutSheets() {
             </div>
 
             {/* Exercises in Sheet */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContainer: 'space-between', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1E' }}>Exercises ({editingSheet.exercises.length})</span>
                 {editingSheet.exercises.length >= 2 && (
                   <button
                     type="button"
+                    className="sheet-btn"
                     style={{ 
-                      background: '#F2F2F7', 
-                      color: '#1C1C1E', 
+                      background: '#FFFFFF', 
+                      color: '#007AFF', 
                       fontSize: 11, 
                       fontWeight: 600,
                       display: 'flex',
@@ -818,14 +1002,14 @@ export default function WorkoutSheets() {
               </div>
 
               {editingSheet.exercises.length === 0 && (
-                <div style={{ padding: '24px 16px', textAlign: 'center', background: '#F2F2F7', borderRadius: '16px', border: '1px dashed #E5E5EA' }}>
+                <div style={{ padding: '24px 16px', textAlign: 'center', background: '#FFFFFF', borderRadius: '16px', border: '1px dashed #E5E5EA' }}>
                   <Dumbbell size={28} strokeWidth={2.2} color="#8E8E93" style={{ marginBottom: 8 }} />
                   <div style={{ fontSize: 13, color: '#8E8E93', fontWeight: 500 }}>No exercises added yet</div>
                   <div style={{ fontSize: 11, color: '#AEAEB2', marginTop: 2 }}>Tap "Add Exercise" below</div>
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {editingSheet.exercises.map((ex, i) => {
                   const info = getExerciseInfo(ex.exerciseId);
                   const type = getExerciseType(ex.exerciseId);
@@ -843,14 +1027,15 @@ export default function WorkoutSheets() {
                       onDragOver={(e) => handleDragOver(e, i)}
                       onDragEnd={handleDragEnd}
                       style={{
-                        background: isDragging ? '#F2F2F7' : '#FFFFFF',
+                        background: '#FFFFFF',
                         borderRadius: '14px',
-                        border: isDragging ? '1.5px dashed #1C1C1E' : '1px solid #E5E5EA',
+                        border: '1px solid #E5E5EA',
                         overflow: 'hidden',
-                        transition: 'all 0.15s ease',
-                        opacity: isDragging ? 0.7 : 1,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                        animation: 'sheetsExInsert 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                        opacity: isDragging ? 0.4 : 1,
+                        transform: isDragging ? 'scale(0.96)' : 'scale(1)',
+                        boxShadow: isDragging ? '0 12px 24px rgba(0,0,0,0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
+                        animation: 'sheetsExInsert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                       }}
                     >
                       {/* Collapsed Header — always visible */}
@@ -879,12 +1064,13 @@ export default function WorkoutSheets() {
                         </div>
                         <button
                           type="button"
+                          className="sheet-btn"
                           style={{ 
                             width: 24, 
                             height: 24, 
                             borderRadius: '50%',
                             background: '#FFF0F0', 
-                            color: '#E04F4F', 
+                            color: '#FF3B30', 
                             border: 'none',
                             display: 'flex',
                             alignItems: 'center',
@@ -900,10 +1086,11 @@ export default function WorkoutSheets() {
 
                       {/* Expanded Config */}
                       {isOpen && (
-                        <div style={{ padding: '0 14px 14px', borderTop: '1px solid #E5E5EA', background: '#F9F9FB' }}>
+                        <div className="ex-config-container" style={{ padding: '0 14px 14px', borderTop: '1px solid #E5E5EA', background: '#F9F9FB' }}>
                           <div style={{ display: 'flex', gap: 4, marginTop: 10, marginBottom: 10 }}>
                             <button 
                               type="button" 
+                              className="sheet-btn"
                               style={{ 
                                 width: 28, 
                                 height: 28, 
@@ -922,6 +1109,7 @@ export default function WorkoutSheets() {
                             </button>
                             <button 
                               type="button" 
+                              className="sheet-btn"
                               style={{ 
                                 width: 28, 
                                 height: 28, 
@@ -955,17 +1143,24 @@ export default function WorkoutSheets() {
                                   width: '100%', 
                                   background: '#FFFFFF', 
                                   border: '1px solid #E5E5EA', 
-                                  borderRadius: '8px', 
+                                  borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
                                   color: '#1C1C1E',
                                   boxSizing: 'border-box',
+                                  transition: 'border-color 0.2s',
                                 }}
                                 value={ex.minSets || ex.sets || 3} 
                                 onChange={e => updateExerciseInSheet(i, 'minSets', +e.target.value)} 
-                                onFocus={handleFocus} 
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = '#007AFF';
+                                  handleFocus(e);
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = '#E5E5EA';
+                                }}
                               />
                             </div>
                             <div>
@@ -979,17 +1174,24 @@ export default function WorkoutSheets() {
                                   width: '100%', 
                                   background: '#FFFFFF', 
                                   border: '1px solid #E5E5EA', 
-                                  borderRadius: '8px', 
+                                  borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
                                   color: '#1C1C1E',
                                   boxSizing: 'border-box',
+                                  transition: 'border-color 0.2s',
                                 }}
                                 value={ex.maxSets || ex.minSets || ex.sets || 5} 
                                 onChange={e => updateExerciseInSheet(i, 'maxSets', +e.target.value)} 
-                                onFocus={handleFocus} 
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = '#007AFF';
+                                  handleFocus(e);
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = '#E5E5EA';
+                                }}
                               />
                             </div>
                             <div>
@@ -1003,17 +1205,24 @@ export default function WorkoutSheets() {
                                   width: '100%', 
                                   background: '#FFFFFF', 
                                   border: '1px solid #E5E5EA', 
-                                  borderRadius: '8px', 
+                                  borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
                                   color: '#1C1C1E',
                                   boxSizing: 'border-box',
+                                  transition: 'border-color 0.2s',
                                 }}
                                 value={ex.reps} 
                                 onChange={e => updateExerciseInSheet(i, 'reps', +e.target.value)} 
-                                onFocus={handleFocus} 
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = '#007AFF';
+                                  handleFocus(e);
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = '#E5E5EA';
+                                }}
                               />
                             </div>
                             <div>
@@ -1027,18 +1236,25 @@ export default function WorkoutSheets() {
                                   width: '100%', 
                                   background: '#FFFFFF', 
                                   border: '1px solid #E5E5EA', 
-                                  borderRadius: '8px', 
+                                  borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
                                   color: '#1C1C1E',
                                   boxSizing: 'border-box',
+                                  transition: 'border-color 0.2s',
                                 }}
                                 placeholder="0" 
                                 value={ex.weight || ''} 
                                 onChange={e => updateExerciseInSheet(i, 'weight', +e.target.value)} 
-                                onFocus={handleFocus} 
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = '#007AFF';
+                                  handleFocus(e);
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = '#E5E5EA';
+                                }}
                               />
                             </div>
                           </div>
@@ -1056,30 +1272,38 @@ export default function WorkoutSheets() {
                                   width: '100%', 
                                   background: '#FFFFFF', 
                                   border: '1px solid #E5E5EA', 
-                                  borderRadius: '8px', 
+                                  borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
                                   color: '#1C1C1E',
                                   boxSizing: 'border-box',
+                                  transition: 'border-color 0.2s',
                                 }}
                                 value={ex.restMinutes} 
                                 onChange={e => updateExerciseInSheet(i, 'restMinutes', +e.target.value)} 
-                                onFocus={handleFocus} 
+                                onFocus={(e) => {
+                                  e.target.style.borderColor = '#007AFF';
+                                  handleFocus(e);
+                                }}
+                                onBlur={(e) => {
+                                  e.target.style.borderColor = '#E5E5EA';
+                                }}
                               />
                             </div>
                             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                               <button
                                 type="button"
+                                className="sheet-btn"
                                 onClick={() => updateExerciseInSheet(i, 'amrap', !ex.amrap)}
                                 style={{
                                   width: '100%',
                                   height: '37px',
-                                  background: ex.amrap ? '#1C1C1E' : '#FFFFFF',
-                                  color: ex.amrap ? '#FFFFFF' : '#1C1C1E',
-                                  border: '1px solid #E5E5EA',
-                                  borderRadius: '8px',
+                                  background: ex.amrap ? '#E5F1FF' : '#FFFFFF',
+                                  color: ex.amrap ? '#007AFF' : '#1C1C1E',
+                                  border: ex.amrap ? '1px solid #007AFF' : '1px solid #E5E5EA',
+                                  borderRadius: '10px',
                                   fontSize: 12,
                                   fontWeight: 600,
                                   display: 'flex',
@@ -1090,7 +1314,7 @@ export default function WorkoutSheets() {
                                   transition: 'all 0.2s',
                                 }}
                               >
-                                <Check size={12} strokeWidth={2.4} color={ex.amrap ? '#FFFFFF' : '#8E8E93'} />
+                                <Check size={12} strokeWidth={2.4} color={ex.amrap ? '#007AFF' : '#8E8E93'} />
                                 AMRAP
                               </button>
                             </div>
@@ -1101,16 +1325,23 @@ export default function WorkoutSheets() {
                               width: '100%',
                               background: '#FFFFFF',
                               border: '1px solid #E5E5EA',
-                              borderRadius: '8px',
+                              borderRadius: '10px',
                               padding: '8px 10px',
                               fontSize: 12,
                               outline: 'none',
                               color: '#1C1C1E',
                               boxSizing: 'border-box',
+                              transition: 'border-color 0.2s',
                             }}
                             placeholder="Notes (optional)"
                             value={ex.notes || ''} 
                             onChange={e => updateExerciseInSheet(i, 'notes', e.target.value)}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#007AFF';
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#E5E5EA';
+                            }}
                           />
                         </div>
                       )}
@@ -1122,6 +1353,7 @@ export default function WorkoutSheets() {
               {/* Add Exercise Button */}
               <button
                 type="button"
+                className="sheet-btn"
                 style={{ 
                   marginTop: 8,
                   display: 'flex',
@@ -1137,7 +1369,6 @@ export default function WorkoutSheets() {
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  transition: 'background-color 0.2s',
                 }}
                 onClick={() => setShowCatalog(true)}
               >
@@ -1147,6 +1378,7 @@ export default function WorkoutSheets() {
 
             {/* Save Button */}
             <button
+              className="sheet-btn"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1161,13 +1393,13 @@ export default function WorkoutSheets() {
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: editingSheet.name.trim() ? 'pointer' : 'default',
-                transition: 'background-color 0.2s',
               }}
               onClick={handleSaveSheet}
               disabled={!editingSheet.name.trim()}
             >
               <Check size={16} strokeWidth={2.4} /> {editingSheet.id ? 'Save Changes' : 'Create Sheet'}
             </button>
+          </div>
         </Modal>
       )}
 
@@ -1178,8 +1410,22 @@ export default function WorkoutSheets() {
         title="Add Exercise"
         type="bottom-sheet"
       >
-        {/* Search and filters container */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+        {/* Sticky Search and filters container */}
+        <div style={{
+          position: 'sticky',
+          top: -24,
+          background: 'var(--bg-secondary)',
+          zIndex: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          paddingTop: 12,
+          paddingBottom: 12,
+          borderBottom: '1px solid #E5E5EA',
+          margin: '0 -20px 12px -20px',
+          paddingLeft: 20,
+          paddingRight: 20,
+        }}>
           {/* Search bar */}
           <div style={{ position: 'relative' }}>
             <Search size={16} strokeWidth={2.4} color="#8E8E93" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
@@ -1193,11 +1439,18 @@ export default function WorkoutSheets() {
                 padding: '10px 12px 10px 36px',
                 borderRadius: '10px',
                 border: '1px solid #E5E5EA',
-                background: '#F2F2F7',
+                background: '#FFFFFF',
                 fontSize: 14,
                 outline: 'none',
                 boxSizing: 'border-box',
                 fontFamily: 'inherit',
+                transition: 'all 0.2s',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#007AFF';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#E5E5EA';
               }}
             />
             {catalogSearch && (
@@ -1223,7 +1476,7 @@ export default function WorkoutSheets() {
           </div>
 
           {/* Primary Category selector */}
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
             {[
               { id: 'all', label: 'All' },
               { id: 'strength', label: 'Strength' },
@@ -1236,17 +1489,17 @@ export default function WorkoutSheets() {
                 <button
                   key={c.id}
                   onClick={() => setCatalogCategory(c.id)}
+                  className="sheet-chip"
                   style={{
                     flexShrink: 0,
-                    background: isAct ? '#1C1C1E' : '#F2F2F7',
+                    background: isAct ? '#007AFF' : '#FFFFFF',
                     color: isAct ? '#FFFFFF' : '#1C1C1E',
-                    border: 'none',
+                    border: isAct ? 'none' : '1px solid #E5E5EA',
                     borderRadius: '100px',
                     padding: '6px 14px',
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
                   }}
                 >
                   {c.label}
@@ -1256,7 +1509,7 @@ export default function WorkoutSheets() {
           </div>
 
           {/* Secondary Muscle selector */}
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, borderBottom: '1px solid #F2F2F7', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
             {[
               { id: 'all', label: 'All Areas' },
               { id: 'upper', label: 'Upper Body' },
@@ -1274,6 +1527,7 @@ export default function WorkoutSheets() {
                 <button
                   key={m.id}
                   onClick={() => setCatalogMuscle(m.id)}
+                  className="sheet-chip"
                   style={{
                     flexShrink: 0,
                     background: isAct ? '#E5F1FF' : '#FFFFFF',
@@ -1284,7 +1538,6 @@ export default function WorkoutSheets() {
                     fontSize: 11,
                     fontWeight: 600,
                     cursor: 'pointer',
-                    transition: 'all 0.15s',
                   }}
                 >
                   {m.label}
@@ -1325,15 +1578,16 @@ export default function WorkoutSheets() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#1C1C1E', marginBottom: 4 }}>No Exercises Found</div>
                   <div style={{ fontSize: 12, marginBottom: 14 }}>Try adjusting your search terms or filters.</div>
                   <button
+                    className="sheet-btn"
                     onClick={() => {
                       setCatalogSearch('');
                       setCatalogCategory('all');
                       setCatalogMuscle('all');
                     }}
                     style={{
-                      background: '#F2F2F7',
+                      background: '#FFFFFF',
                       color: '#007AFF',
-                      border: 'none',
+                      border: '1px solid #E5E5EA',
                       borderRadius: '8px',
                       padding: '8px 16px',
                       fontSize: 13,
@@ -1351,21 +1605,18 @@ export default function WorkoutSheets() {
               <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {/* Category Header */}
                 <div style={{
-                  position: 'sticky',
-                  top: 0,
-                  background: '#FFFFFF',
-                  zIndex: 2,
                   fontSize: 11,
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   color: '#8E8E93',
-                  padding: '6px 0',
-                  borderBottom: '1px solid #F2F2F7',
-                  marginBottom: 4,
+                  padding: '12px 0 6px',
+                  borderBottom: '1px solid #E5E5EA',
+                  marginBottom: 8,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6
+                  gap: 6,
+                  marginTop: 8
                 }}>
                   <span>{group.icon}</span>
                   <span>{group.name}</span>
@@ -1381,6 +1632,7 @@ export default function WorkoutSheets() {
                         key={ex.id}
                         disabled={alreadyAdded}
                         onClick={() => addExerciseToSheet(ex)}
+                        className="sheet-btn"
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -1393,7 +1645,6 @@ export default function WorkoutSheets() {
                           cursor: alreadyAdded ? 'default' : 'pointer',
                           textAlign: 'left',
                           opacity: alreadyAdded ? 0.6 : 1,
-                          transition: 'all 0.15s ease',
                           boxSizing: 'border-box',
                         }}
                       >
@@ -1458,7 +1709,7 @@ export default function WorkoutSheets() {
           marginBottom: 12,
           margin: '0 auto 12px'
         }}>
-          <Trash2 size={22} strokeWidth={2.2} color="#E04F4F" />
+          <Trash2 size={22} strokeWidth={2.2} color="#FF3B30" />
         </div>
         <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1C1C1E', marginBottom: 6, margin: 0 }}>Delete this sheet?</h2>
         <p style={{ fontSize: 12, color: '#8E8E93', marginBottom: 20, lineHeight: 1.5, margin: '6px 0 20px' }}>
@@ -1467,6 +1718,7 @@ export default function WorkoutSheets() {
         </p>
         <div style={{ display: 'flex', gap: 8, width: '100%' }}>
           <button 
+            className="sheet-btn"
             style={{ 
               flex: 1,
               background: '#F2F2F7',
@@ -1483,10 +1735,11 @@ export default function WorkoutSheets() {
             Cancel
           </button>
           <button 
+            className="sheet-btn"
             style={{ 
               flex: 1,
               background: '#FFF0F0',
-              color: '#E04F4F',
+              color: '#FF3B30',
               border: '1px solid #FFD1D1',
               borderRadius: '12px',
               padding: '10px 16px',
@@ -1532,9 +1785,9 @@ export default function WorkoutSheets() {
             lineHeight: 1.4,
           }}>
             {toast.type === 'success' ? (
-              <Check size={16} strokeWidth={2.5} color="#2E9E47" />
+              <Check size={16} strokeWidth={2.5} color="#34C759" />
             ) : (
-              <AlertTriangle size={16} strokeWidth={2.5} color="#FFB300" />
+              <AlertTriangle size={16} strokeWidth={2.5} color="#FF9500" />
             )}
             <span>{toast.message}</span>
           </div>
