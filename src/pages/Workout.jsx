@@ -15,6 +15,14 @@ const exercises = new Proxy(rawExercises, {
   get(target, prop) {
     if (typeof prop === 'symbol' || prop === 'then') return target[prop];
     const propStr = String(prop);
+    
+    if (propStr.startsWith('__') || [
+      '$$typeof', 'prototype', 'constructor', 'toJSON', 'nodeType', 
+      'displayName', 'default', 'length', 'name', 'caller', 'arguments'
+    ].includes(propStr)) {
+      return target[prop];
+    }
+
     let resolvedProp = propStr;
     if (legacyExerciseMap[resolvedProp]) {
       resolvedProp = legacyExerciseMap[resolvedProp];
