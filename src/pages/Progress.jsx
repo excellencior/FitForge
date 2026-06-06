@@ -19,18 +19,23 @@ const legacyExerciseMap = {
 
 const exercises = new Proxy(rawExercises, {
   get(target, prop) {
-    if (typeof prop !== 'string') return target[prop];
-    let resolvedProp = prop;
-    if (legacyExerciseMap[prop]) {
-      resolvedProp = legacyExerciseMap[prop];
+    if (typeof prop === 'symbol' || prop === 'then') return target[prop];
+    const propStr = String(prop);
+    let resolvedProp = propStr;
+    if (legacyExerciseMap[resolvedProp]) {
+      resolvedProp = legacyExerciseMap[resolvedProp];
     }
     const exercise = target[resolvedProp];
     if (exercise) return exercise;
 
+    const display = resolvedProp && resolvedProp !== 'undefined' && resolvedProp !== 'null'
+      ? resolvedProp.charAt(0).toUpperCase() + resolvedProp.slice(1)
+      : 'Unknown Exercise';
+
     return {
-      id: prop,
-      name: prop.charAt(0).toUpperCase() + prop.slice(1),
-      nameShort: prop.charAt(0).toUpperCase() + prop.slice(1),
+      id: resolvedProp,
+      name: display,
+      nameShort: display,
       icon: '💪',
       muscle: 'N/A',
       category: 'strength',

@@ -13,18 +13,23 @@ const legacyExerciseMap = {
 
 const exercises = new Proxy(rawExercises, {
   get(target, prop) {
-    if (typeof prop !== 'string') return target[prop];
-    let resolvedProp = prop;
-    if (legacyExerciseMap[prop]) {
-      resolvedProp = legacyExerciseMap[prop];
+    if (typeof prop === 'symbol' || prop === 'then') return target[prop];
+    const propStr = String(prop);
+    let resolvedProp = propStr;
+    if (legacyExerciseMap[resolvedProp]) {
+      resolvedProp = legacyExerciseMap[resolvedProp];
     }
     const exercise = target[resolvedProp];
     if (exercise) return exercise;
 
+    const display = resolvedProp && resolvedProp !== 'undefined' && resolvedProp !== 'null'
+      ? resolvedProp.charAt(0).toUpperCase() + resolvedProp.slice(1)
+      : 'Unknown Exercise';
+
     return {
-      id: prop,
-      name: prop.charAt(0).toUpperCase() + prop.slice(1),
-      nameShort: prop.charAt(0).toUpperCase() + prop.slice(1),
+      id: resolvedProp,
+      name: display,
+      nameShort: display,
       icon: '💪',
       muscle: 'N/A',
       category: 'strength',
@@ -488,6 +493,10 @@ function Workout() {
   // RENDER: Completion Screen
   // ════════════════════════════════════════════
   if (mode === 'complete') {
+    if (!template || !template.exercises) {
+      setTimeout(() => setMode('plan'), 0);
+      return null;
+    }
     const totalSets = workoutLog.length;
     const totalVolume = workoutLog.reduce((s, l) => s + l.weight * l.reps, 0);
 
@@ -790,6 +799,13 @@ function Workout() {
   // RENDER: Active Workout
   // ════════════════════════════════════════════
   if (mode === 'active') {
+    if (!template || !template.exercises || template.exercises.length === 0 || !template.exercises[currentExIdx]) {
+      setTimeout(() => {
+        setMode('plan');
+        localStorage.removeItem('fitforge_active_workout_session');
+      }, 0);
+      return null;
+    }
     const exTemplate = template.exercises[currentExIdx];
     const ex = exercises[exTemplate.exerciseId];
     const minSets = exTemplate.minSets || exTemplate.sets || 3;
