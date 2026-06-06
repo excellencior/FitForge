@@ -385,15 +385,7 @@ export default function Progress() {
 
   return (
     <div className="page-content" style={{
-      maxWidth: '480px',
-      margin: '0 auto',
-      paddingLeft: '16px',
-      paddingRight: '16px',
-      paddingTop: '20px',
       paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)',
-      background: '#FFFFFF',
-      minHeight: '100vh',
-      boxSizing: 'border-box'
     }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>

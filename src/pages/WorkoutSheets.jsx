@@ -410,18 +410,9 @@ export default function WorkoutSheets() {
     <div 
       className="page-content" 
       style={{ 
-        maxWidth: 480, 
-        margin: '0 auto', 
         paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)', 
-        paddingTop: 24,
-        paddingLeft: 16,
-        paddingRight: 16,
-        background: '#FFFFFF',
-        minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-        boxSizing: 'border-box',
       }}
     >
       {/* Header */}
