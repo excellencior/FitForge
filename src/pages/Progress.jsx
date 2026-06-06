@@ -6,7 +6,43 @@ import {
 } from 'chart.js';
 import { getWorkoutLogs, getBodyStats, saveBodyStat, getDietLogs, getPRRecords, getSettings, getWorkoutSheets, saveWorkoutSheet, setActiveSheet, getActiveSheet } from '../utils/storage';
 import { useModalLock, useInputFocus } from '../utils/ux';
-import { exercises } from '../data/workouts';
+import { exercises as rawExercises } from '../data/workouts';
+
+const legacyExerciseMap = {
+  latPull: 'latPulldown',
+  romanianDL: 'romanianDeadlift',
+  tricepDip: 'dips',
+  shoulderRaise: 'lateralRaise',
+  inclineBench: 'inclineDbPress',
+  bwCircuit: 'burpees'
+};
+
+const exercises = new Proxy(rawExercises, {
+  get(target, prop) {
+    if (typeof prop !== 'string') return target[prop];
+    let resolvedProp = prop;
+    if (legacyExerciseMap[prop]) {
+      resolvedProp = legacyExerciseMap[prop];
+    }
+    const exercise = target[resolvedProp];
+    if (exercise) return exercise;
+
+    return {
+      id: prop,
+      name: prop.charAt(0).toUpperCase() + prop.slice(1),
+      nameShort: prop.charAt(0).toUpperCase() + prop.slice(1),
+      icon: '💪',
+      muscle: 'N/A',
+      category: 'strength',
+      muscleGroup: 'fullbody',
+      type: 'accessory',
+      formTips: [],
+      warnings: [],
+      startWeight: 0,
+      increment: 0
+    };
+  }
+});
 import {
   Scale, Plus, X, Trophy, Dumbbell, Flame, Ruler, ChevronRight,
   Calendar, User, TrendingUp, Apple, History

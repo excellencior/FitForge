@@ -1,6 +1,42 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Check, ChevronDown, ChevronUp, ChevronRight, AlertTriangle, Timer, Trophy, X, Plus, Zap, Dumbbell, Activity, Shield, Footprints, Compass } from 'lucide-react';
-import { exercises, workoutTemplates, warmupRoutine, warmupSets, irradiationChecklist } from '../data/workouts';
+import { exercises as rawExercises, workoutTemplates, warmupRoutine, warmupSets, irradiationChecklist } from '../data/workouts';
+
+const legacyExerciseMap = {
+  latPull: 'latPulldown',
+  romanianDL: 'romanianDeadlift',
+  tricepDip: 'dips',
+  shoulderRaise: 'lateralRaise',
+  inclineBench: 'inclineDbPress',
+  bwCircuit: 'burpees'
+};
+
+const exercises = new Proxy(rawExercises, {
+  get(target, prop) {
+    if (typeof prop !== 'string') return target[prop];
+    let resolvedProp = prop;
+    if (legacyExerciseMap[prop]) {
+      resolvedProp = legacyExerciseMap[prop];
+    }
+    const exercise = target[resolvedProp];
+    if (exercise) return exercise;
+
+    return {
+      id: prop,
+      name: prop.charAt(0).toUpperCase() + prop.slice(1),
+      nameShort: prop.charAt(0).toUpperCase() + prop.slice(1),
+      icon: '💪',
+      muscle: 'N/A',
+      category: 'strength',
+      muscleGroup: 'fullbody',
+      type: 'accessory',
+      formTips: [],
+      warnings: [],
+      startWeight: 0,
+      increment: 0
+    };
+  }
+});
 import { getTodayWorkoutType, saveWorkoutLog, updatePR, getToday, getPRRecords, getActiveSheet, getWorkoutsByDate, getSettings } from '../utils/storage';
 import { useInputFocus, useDebounce } from '../utils/ux';
 import Modal from '../components/Modal';
