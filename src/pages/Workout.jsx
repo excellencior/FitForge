@@ -123,6 +123,7 @@ function Workout() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [completionDuration, setCompletionDuration] = useState(0);
   const [showFlexChoice, setShowFlexChoice] = useState(false);
+  const [showGoAgainWarning, setShowGoAgainWarning] = useState(false);
   const [todayWorkouts, setTodayWorkouts] = useState([]);
   const [totalRestTimeSpent, setTotalRestTimeSpent] = useState(0);
   const [exerciseRestTimes, setExerciseRestTimes] = useState({});
@@ -136,7 +137,6 @@ function Workout() {
 
   const timerRef = useRef(null);
 
-  // ── Init — check for active sheet first, fallback to personalized custom template ──
   // ── Init — check for persisted active session first, fallback to active sheet or default CNS Blueprint ──
   useEffect(() => {
     const active = getActiveSheet();
@@ -157,15 +157,45 @@ function Workout() {
             setCurrentSet(session.currentSet);
             setRepsInput(session.repsInput);
             setWeightInput(session.weightInput);
-            setIsResting(session.isResting);
-            setRestTime(session.restTime);
-            setRestTotal(session.restTotal);
             setTimerPaused(session.timerPaused);
-            setWorkoutLog(session.workoutLog);
-            setPrsHit(session.prsHit);
             setWorkoutStartTime(session.workoutStartTime);
-            setTotalRestTimeSpent(session.totalRestTimeSpent || 0);
-            setExerciseRestTimes(session.exerciseRestTimes || {});
+
+            // Catch up elapsed rest time
+            let restoredIsResting = session.isResting;
+            let restoredRestTime = session.restTime;
+            let restoredTotalRestTimeSpent = session.totalRestTimeSpent || 0;
+            let restoredExerciseRestTimes = session.exerciseRestTimes || {};
+
+            if (session.isResting && !session.timerPaused && session.restLastUpdated) {
+              const elapsedSecs = Math.floor((Date.now() - session.restLastUpdated) / 1000);
+              if (elapsedSecs > 0) {
+                if (elapsedSecs >= restoredRestTime) {
+                  // Rest has completed while away
+                  restoredTotalRestTimeSpent += restoredRestTime;
+                  const currentExId = session.template?.exercises?.[session.currentExIdx]?.exerciseId;
+                  if (currentExId) {
+                    restoredExerciseRestTimes[currentExId] = (restoredExerciseRestTimes[currentExId] || 0) + restoredRestTime;
+                  }
+                  restoredRestTime = 0;
+                  restoredIsResting = false;
+                } else {
+                  restoredRestTime -= elapsedSecs;
+                  restoredTotalRestTimeSpent += elapsedSecs;
+                  const currentExId = session.template?.exercises?.[session.currentExIdx]?.exerciseId;
+                  if (currentExId) {
+                    restoredExerciseRestTimes[currentExId] = (restoredExerciseRestTimes[currentExId] || 0) + elapsedSecs;
+                  }
+                }
+              }
+            }
+
+            setIsResting(restoredIsResting);
+            setRestTime(restoredRestTime);
+            setRestTotal(session.restTotal);
+            setTotalRestTimeSpent(restoredTotalRestTimeSpent);
+            setExerciseRestTimes(restoredExerciseRestTimes);
+            setWorkoutLog(session.workoutLog || []);
+            setPrsHit(session.prsHit || []);
             return; // successfully loaded, skip default initialization
           } else {
             // Stale/out-of-sync session, clear it to reload the new active sheet!
@@ -217,6 +247,7 @@ function Workout() {
         workoutStartTime,
         totalRestTimeSpent,
         exerciseRestTimes,
+        restLastUpdated: Date.now(),
       };
       localStorage.setItem('fitforge_active_workout_session', JSON.stringify(session));
     } else if (mode === 'plan' || mode === 'complete') {
@@ -234,7 +265,7 @@ function Workout() {
     setTodayWorkouts(getWorkoutsByDate(getToday()));
   }, [mode]);
 
-  // ── Timer logic — only depend on isResting and timerPaused ──
+  // ── Timer logic ──
   useEffect(() => {
     if (isResting && !timerPaused) {
       timerRef.current = setInterval(() => {
@@ -280,7 +311,7 @@ function Workout() {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [isResting, timerPaused]);
+  }, [isResting, timerPaused, template, currentExIdx]);
 
   // ── Helpers ──
   const formatTime = (s) => {
@@ -859,7 +890,31 @@ function Workout() {
               {getExerciseIcon(exTemplate.exerciseId, 24)}
             </div>
             <h2 style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', margin: '0 0 4px', letterSpacing: '-0.02em' }}>{ex.nameShort}</h2>
-            <span style={{ fontSize: 13, color: '#8E8E93', fontWeight: '500' }}>{ex.muscle}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 13, color: '#8E8E93', fontWeight: '500' }}>{ex.muscle}</span>
+              
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 6,
+                padding: '6px 12px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E5E5EA',
+                borderRadius: 12,
+                fontSize: 12,
+                fontWeight: '600',
+                color: '#3A3A3C',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+              }}>
+                <span>Target: {minSets}{maxSets && maxSets !== minSets ? `-${maxSets}` : ''} × {exTemplate.reps}{exTemplate.amrap ? '+' : ''} @ {getExerciseWeight(exTemplate.exerciseId, exTemplate.weight)}kg</span>
+                <span style={{ color: '#C7C7CC' }}>•</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Timer size={13} strokeWidth={2.4} style={{ color: '#007AFF' }} />
+                  {exTemplate.restMinutes}m rest
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Set counter */}
@@ -1031,7 +1086,7 @@ function Workout() {
           )}
 
           {/* Input fields */}
-          {!isResting && (
+          {!isResting && !showFlexChoice && (
             <div style={{ display: 'flex', gap: 12, margin: '24px 0' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: '600', color: '#8E8E93', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Weight (kg)</label>
@@ -1039,7 +1094,6 @@ function Workout() {
                   type="number"
                   inputMode="decimal"
                   min="0"
-                  disabled
                   className="input-field"
                   style={{
                     fontSize: 24,
@@ -1047,15 +1101,16 @@ function Workout() {
                     padding: 12,
                     borderRadius: 14,
                     border: '1px solid #E5E5EA',
-                    backgroundColor: '#F2F2F7',
-                    color: '#8E8E93',
+                    backgroundColor: '#FFFFFF',
+                    color: '#1C1C1E',
                     fontWeight: '700',
                     height: 54,
                     boxSizing: 'border-box',
-                    cursor: 'not-allowed'
+                    cursor: 'text'
                   }}
                   value={weightInput}
                   placeholder="0"
+                  onChange={(e) => setWeightInput(e.target.value)}
                 />
               </div>
               <div style={{ flex: 1 }}>
@@ -1066,7 +1121,6 @@ function Workout() {
                   type="number"
                   inputMode="numeric"
                   min="0"
-                  disabled
                   className="input-field"
                   style={{
                     fontSize: 24,
@@ -1074,15 +1128,16 @@ function Workout() {
                     padding: 12,
                     borderRadius: 14,
                     border: '1px solid #E5E5EA',
-                    backgroundColor: '#F2F2F7',
-                    color: '#8E8E93',
+                    backgroundColor: '#FFFFFF',
+                    color: '#1C1C1E',
                     fontWeight: '700',
                     height: 54,
                     boxSizing: 'border-box',
-                    cursor: 'not-allowed'
+                    cursor: 'text'
                   }}
                   value={repsInput}
                   placeholder="0"
+                  onChange={(e) => setRepsInput(e.target.value)}
                 />
               </div>
             </div>
