@@ -669,12 +669,13 @@ export default function WorkoutSheets() {
       </div>
 
       {/* ===== SHEET EDITOR MODAL ===== */}
-      <Modal
-        isOpen={showEditor && !!editingSheet}
-        onClose={() => { setShowEditor(false); setEditingSheet(null); }}
-        title={editingSheet?.id ? 'Edit Sheet' : 'New Workout Sheet'}
-        type="bottom-sheet"
-      >
+      {editingSheet && (
+        <Modal
+          isOpen={showEditor}
+          onClose={() => { setShowEditor(false); setEditingSheet(null); }}
+          title={editingSheet.id ? 'Edit Sheet' : 'New Workout Sheet'}
+          type="bottom-sheet"
+        >
 
             {/* Sheet Info */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1142,7 +1143,8 @@ export default function WorkoutSheets() {
             >
               <Check size={16} strokeWidth={2.4} /> {editingSheet.id ? 'Save Changes' : 'Create Sheet'}
             </button>
-      </Modal>
+        </Modal>
+      )}
 
       {/* ===== EXERCISE CATALOG MODAL ===== */}
       <Modal

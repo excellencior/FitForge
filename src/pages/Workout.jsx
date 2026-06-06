@@ -959,6 +959,7 @@ function Workout() {
                   type="number"
                   inputMode="decimal"
                   min="0"
+                  disabled
                   className="input-field"
                   style={{
                     fontSize: 24,
@@ -966,14 +967,14 @@ function Workout() {
                     padding: 12,
                     borderRadius: 14,
                     border: '1px solid #E5E5EA',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: '#F2F2F7',
+                    color: '#8E8E93',
                     fontWeight: '700',
                     height: 54,
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    cursor: 'not-allowed'
                   }}
                   value={weightInput}
-                  onChange={e => setWeightInput(e.target.value)}
-                  onFocus={handleInputFocus}
                   placeholder="0"
                 />
               </div>
@@ -985,6 +986,7 @@ function Workout() {
                   type="number"
                   inputMode="numeric"
                   min="0"
+                  disabled
                   className="input-field"
                   style={{
                     fontSize: 24,
@@ -992,14 +994,14 @@ function Workout() {
                     padding: 12,
                     borderRadius: 14,
                     border: '1px solid #E5E5EA',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: '#F2F2F7',
+                    color: '#8E8E93',
                     fontWeight: '700',
                     height: 54,
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    cursor: 'not-allowed'
                   }}
                   value={repsInput}
-                  onChange={e => setRepsInput(e.target.value)}
-                  onFocus={handleInputFocus}
                   placeholder="0"
                 />
               </div>

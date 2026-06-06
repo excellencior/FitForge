@@ -380,29 +380,37 @@ export default function Dashboard() {
                 return logDate >= weekStart && logDate < weekEnd;
               });
 
+              let displayBg = dotBg;
+              let displayBorder = border;
+              let displayShadow = 'none';
+
+              if (hasWorkout) {
+                displayBg = 'linear-gradient(135deg, #FF9500 0%, #FF5E3A 100%)';
+                displayBorder = 'none';
+                displayShadow = '0 3px 8px rgba(255, 94, 58, 0.2)';
+              }
+
               return (
                 <div
                   key={w}
                   style={{
                     ...styles.weekDot,
-                    backgroundColor: dotBg,
-                    border: border,
-                    position: 'relative',
+                    background: displayBg,
+                    border: displayBorder,
+                    boxShadow: displayShadow,
                   }}
                 >
-                  <span style={{
-                    ...styles.weekNum,
-                    color: textColor,
-                    fontWeight: isCurrent ? '700' : '600',
-                  }}>{w}</span>
-                  {hasWorkout && (
+                  {hasWorkout ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+                      <span style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF', lineHeight: 1 }}>{w}</span>
+                      <span style={{ fontSize: 9, marginTop: 1, lineHeight: 1 }}>🔥</span>
+                    </div>
+                  ) : (
                     <span style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -4,
-                      fontSize: 12,
-                      lineHeight: 1
-                    }}>🔥</span>
+                      ...styles.weekNum,
+                      color: textColor,
+                      fontWeight: isCurrent ? '700' : '600',
+                    }}>{w}</span>
                   )}
                 </div>
               );
