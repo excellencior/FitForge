@@ -9,7 +9,7 @@ import Modal from '../components/Modal';
 import {
   Plus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
   Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star, Calendar,
-  GripVertical, Sparkles
+  GripVertical, Sparkles, Search
 } from 'lucide-react';
 
 const KEYFRAMES_ID = 'sheets-keyframes';
@@ -38,33 +38,15 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
   document.head.appendChild(sheet);
 }
 
-const exerciseCatalog = [
-  // Compounds
-  { id: 'squat', name: 'Barbell Back Squat', muscle: 'Legs, Core', type: 'compound' },
-  { id: 'deadlift', name: 'Barbell Deadlift', muscle: 'Back, Legs', type: 'compound' },
-  { id: 'bench', name: 'Barbell Bench Press', muscle: 'Chest, Triceps', type: 'compound' },
-  { id: 'ohp', name: 'Overhead Press', muscle: 'Shoulders, Triceps', type: 'compound' },
-  { id: 'pullup', name: 'Weighted Pull-ups', muscle: 'Back, Biceps', type: 'compound' },
-  { id: 'row', name: 'Bent-Over Row', muscle: 'Back, Biceps', type: 'compound' },
-  // Accessories
-  { id: 'curl', name: 'Barbell Curl', muscle: 'Biceps', type: 'accessory' },
-  { id: 'tricepDip', name: 'Tricep Dips', muscle: 'Triceps', type: 'accessory' },
-  { id: 'legPress', name: 'Leg Press', muscle: 'Legs', type: 'accessory' },
-  { id: 'latPull', name: 'Lat Pulldown', muscle: 'Back', type: 'accessory' },
-  { id: 'shoulderRaise', name: 'Lateral Raise', muscle: 'Shoulders', type: 'accessory' },
-  { id: 'facePull', name: 'Face Pull', muscle: 'Rear Delts', type: 'accessory' },
-  { id: 'plank', name: 'Plank Hold', muscle: 'Core', type: 'accessory' },
-  { id: 'legCurl', name: 'Leg Curl', muscle: 'Hamstrings', type: 'accessory' },
-  { id: 'calfRaise', name: 'Calf Raise', muscle: 'Calves', type: 'accessory' },
-  { id: 'inclineBench', name: 'Incline Bench Press', muscle: 'Upper Chest', type: 'compound' },
-  { id: 'romanianDL', name: 'Romanian Deadlift', muscle: 'Hamstrings, Glutes', type: 'compound' },
-  { id: 'frontSquat', name: 'Front Squat', muscle: 'Quads, Core', type: 'compound' },
-  // Conditioning
-  { id: 'farmerWalk', name: "Farmer's Walk", muscle: 'Grip, Full Body', type: 'conditioning' },
-  { id: 'kbSwing', name: 'Kettlebell Swing', muscle: 'Hips, Core', type: 'conditioning' },
-  { id: 'jumpRope', name: 'Jump Rope', muscle: 'Cardio', type: 'conditioning' },
-  { id: 'bwCircuit', name: 'Bodyweight Circuit', muscle: 'Full Body', type: 'conditioning' },
-];
+const exerciseCatalog = Object.values(defaultExercises).map(ex => ({
+  id: ex.id,
+  name: ex.name,
+  muscle: ex.muscle,
+  category: ex.category || 'strength',
+  muscleGroup: ex.muscleGroup || 'legs',
+  type: ex.type,
+  icon: ex.icon || '💪'
+}));
 
 /*
  * Optimal exercise ordering based on exercise science:
@@ -138,7 +120,9 @@ export default function WorkoutSheets() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingSheet, setEditingSheet] = useState(null);
   const [showCatalog, setShowCatalog] = useState(false);
-  const [catalogFilter, setCatalogFilter] = useState('all');
+  const [catalogCategory, setCatalogCategory] = useState('all');
+  const [catalogMuscle, setCatalogMuscle] = useState('all');
+  const [catalogSearch, setCatalogSearch] = useState('');
   const [expandedSheet, setExpandedSheet] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [expandedExIdx, setExpandedExIdx] = useState(null);
@@ -348,6 +332,47 @@ export default function WorkoutSheets() {
     if (type === 'compound') return <Dumbbell size={size} strokeWidth={2.4} color="#1C1C1E" />;
     if (type === 'conditioning') return <Zap size={size} strokeWidth={2.4} color="#1C1C1E" />;
     return <Sparkles size={size} strokeWidth={2.4} color="#1C1C1E" />;
+  };
+
+  const getAreaOrMuscleMatch = (ex, filter) => {
+    if (filter === 'all') return true;
+    const muscleGroup = (ex.muscleGroup || '').toLowerCase();
+    const muscle = (ex.muscle || '').toLowerCase();
+    const name = (ex.name || '').toLowerCase();
+
+    if (filter === 'upper') {
+      return ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'arms'].includes(muscleGroup) ||
+             muscle.includes('chest') || muscle.includes('back') || muscle.includes('shoulder') ||
+             muscle.includes('biceps') || muscle.includes('triceps') || muscle.includes('lats') ||
+             muscle.includes('arms') || muscle.includes('delt') || muscle.includes('rotator');
+    }
+    if (filter === 'lower') {
+      return ['legs', 'calves', 'quads', 'hamstrings'].includes(muscleGroup) ||
+             muscle.includes('legs') || muscle.includes('quads') || muscle.includes('hamstrings') ||
+             muscle.includes('glutes') || muscle.includes('calves') || muscle.includes('calf');
+    }
+    if (filter === 'chest') {
+      return muscleGroup === 'chest' || muscle.includes('chest') || name.includes('pushup') || name.includes('bench') || name.includes('dip');
+    }
+    if (filter === 'back') {
+      return muscleGroup === 'back' || muscle.includes('back') || muscle.includes('lats') || name.includes('pull') || name.includes('row');
+    }
+    if (filter === 'shoulders') {
+      return muscleGroup === 'shoulders' || muscle.includes('shoulder') || muscle.includes('delt') || (name.includes('press') && !name.includes('bench'));
+    }
+    if (filter === 'biceps') {
+      return muscleGroup === 'biceps' || muscle.includes('bicep') || name.includes('curl') || name.includes('chin-up');
+    }
+    if (filter === 'triceps') {
+      return muscleGroup === 'triceps' || muscle.includes('tricep') || name.includes('pushdown') || name.includes('skull') || name.includes('dip');
+    }
+    if (filter === 'legs') {
+      return muscleGroup === 'legs' || muscle.includes('legs') || muscle.includes('quad') || muscle.includes('hamstring') || muscle.includes('glute') || muscle.includes('calf') || muscle.includes('calves');
+    }
+    if (filter === 'core') {
+      return muscleGroup === 'core' || muscle.includes('core') || muscle.includes('abs') || muscle.includes('oblique') || name.includes('plank') || name.includes('twist') || name.includes('raise');
+    }
+    return false;
   };
 
   return (
@@ -1153,96 +1178,267 @@ export default function WorkoutSheets() {
         title="Add Exercise"
         type="bottom-sheet"
       >
+        {/* Search and filters container */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+          {/* Search bar */}
+          <div style={{ position: 'relative' }}>
+            <Search size={16} strokeWidth={2.4} color="#8E8E93" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Search exercises..."
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px 10px 36px',
+                borderRadius: '10px',
+                border: '1px solid #E5E5EA',
+                background: '#F2F2F7',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+              }}
+            />
+            {catalogSearch && (
+              <button
+                onClick={() => setCatalogSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#8E8E93',
+                  padding: 0,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <X size={16} strokeWidth={2.4} />
+              </button>
+            )}
+          </div>
 
-            {/* Filter chips */}
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-              {['all', 'compound', 'accessory', 'conditioning'].map(f => {
-                const isAct = catalogFilter === f;
-                return (
-                  <button 
-                    key={f} 
+          {/* Primary Category selector */}
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'strength', label: 'Strength' },
+              { id: 'calisthenics', label: 'Calisthenics' },
+              { id: 'cardio', label: 'Cardio' },
+              { id: 'mobility', label: 'Mobility' }
+            ].map(c => {
+              const isAct = catalogCategory === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setCatalogCategory(c.id)}
+                  style={{
+                    flexShrink: 0,
+                    background: isAct ? '#1C1C1E' : '#F2F2F7',
+                    color: isAct ? '#FFFFFF' : '#1C1C1E',
+                    border: 'none',
+                    borderRadius: '100px',
+                    padding: '6px 14px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Secondary Muscle selector */}
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, borderBottom: '1px solid #F2F2F7', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {[
+              { id: 'all', label: 'All Areas' },
+              { id: 'upper', label: 'Upper Body' },
+              { id: 'lower', label: 'Lower Body' },
+              { id: 'chest', label: 'Chest' },
+              { id: 'back', label: 'Back' },
+              { id: 'shoulders', label: 'Shoulder' },
+              { id: 'biceps', label: 'Biceps' },
+              { id: 'triceps', label: 'Triceps' },
+              { id: 'legs', label: 'Legs' },
+              { id: 'core', label: 'Core' }
+            ].map(m => {
+              const isAct = catalogMuscle === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setCatalogMuscle(m.id)}
+                  style={{
+                    flexShrink: 0,
+                    background: isAct ? '#E5F1FF' : '#FFFFFF',
+                    color: isAct ? '#007AFF' : '#8E8E93',
+                    border: isAct ? '1.5px solid #007AFF' : '1px solid #E5E5EA',
+                    borderRadius: '100px',
+                    padding: '5px 12px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Exercise list grouped by category */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {(() => {
+            const filtered = exerciseCatalog.filter(e => {
+              const matchesSearch = !catalogSearch.trim() || 
+                e.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
+                e.muscle.toLowerCase().includes(catalogSearch.toLowerCase());
+              const matchesCategory = catalogCategory === 'all' || e.category === catalogCategory;
+              const matchesMuscle = getAreaOrMuscleMatch(e, catalogMuscle);
+              return matchesSearch && matchesCategory && matchesMuscle;
+            });
+
+            const categoryGroups = [
+              { id: 'strength', name: 'Strength Training', icon: '🏋️' },
+              { id: 'calisthenics', name: 'Calisthenics & Bodyweight', icon: '🤸' },
+              { id: 'cardio', name: 'Cardio & Conditioning', icon: '🏃' },
+              { id: 'mobility', name: 'Mobility & Warm-up', icon: '🧘' }
+            ];
+
+            const grouped = categoryGroups.map(group => {
+              const items = filtered.filter(e => e.category === group.id);
+              return { ...group, items };
+            }).filter(group => group.items.length > 0);
+
+            if (grouped.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8E8E93' }}>
+                  <AlertTriangle size={32} strokeWidth={2} style={{ marginBottom: 10, color: '#FF9500' }} />
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1C1C1E', marginBottom: 4 }}>No Exercises Found</div>
+                  <div style={{ fontSize: 12, marginBottom: 14 }}>Try adjusting your search terms or filters.</div>
+                  <button
+                    onClick={() => {
+                      setCatalogSearch('');
+                      setCatalogCategory('all');
+                      setCatalogMuscle('all');
+                    }}
                     style={{
-                      flexShrink: 0,
-                      background: isAct ? '#1C1C1E' : '#F2F2F7',
-                      color: isAct ? '#FFFFFF' : '#1C1C1E',
+                      background: '#F2F2F7',
+                      color: '#007AFF',
                       border: 'none',
-                      borderRadius: '100px',
-                      padding: '6px 14px',
-                      fontSize: 12,
+                      borderRadius: '8px',
+                      padding: '8px 16px',
+                      fontSize: 13,
                       fontWeight: 600,
                       cursor: 'pointer',
-                      transition: 'all 0.2s',
                     }}
-                    onClick={() => setCatalogFilter(f)}
                   >
-                    {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                    Reset Filters
                   </button>
-                );
-              })}
-            </div>
+                </div>
+              );
+            }
 
-            {/* Exercise list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {exerciseCatalog
-                .filter(e => catalogFilter === 'all' || e.type === catalogFilter)
-                .map(ex => {
-                  const alreadyAdded = editingSheet?.exercises.some(e => e.exerciseId === ex.id);
-                  return (
-                    <button
-                      key={ex.id}
-                      disabled={alreadyAdded}
-                      onClick={() => addExerciseToSheet(ex)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        width: '100%',
-                        padding: '12px 14px',
-                        background: alreadyAdded ? '#F2F2F7' : '#FFFFFF',
-                        borderRadius: '14px',
-                        border: '1px solid #E5E5EA',
-                        cursor: alreadyAdded ? 'default' : 'pointer',
-                        textAlign: 'left',
-                        opacity: alreadyAdded ? 0.6 : 1,
-                        transition: 'all 0.15s ease',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      <div style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '8px',
-                        background: alreadyAdded ? '#E5E5EA' : '#F2F2F7',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}>
-                        {renderExerciseIcon(ex.type, 15)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1C1C1E' }}>{ex.name}</div>
-                        <div style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>{ex.muscle} · {ex.type}</div>
-                      </div>
-                      {alreadyAdded ? (
-                        <span style={{ 
-                          fontSize: 9, 
-                          fontWeight: 700, 
-                          background: '#E5F6ED', 
-                          color: '#2E9E47', 
-                          padding: '2px 6px', 
-                          borderRadius: '100px', 
-                          letterSpacing: '0.03em',
-                          animation: 'sheetsAddPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+            return grouped.map(group => (
+              <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Category Header */}
+                <div style={{
+                  position: 'sticky',
+                  top: 0,
+                  background: '#FFFFFF',
+                  zIndex: 2,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: '#8E8E93',
+                  padding: '6px 0',
+                  borderBottom: '1px solid #F2F2F7',
+                  marginBottom: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <span>{group.icon}</span>
+                  <span>{group.name}</span>
+                  <span style={{ fontSize: 10, fontWeight: 500, color: '#C7C7CC' }}>({group.items.length})</span>
+                </div>
+
+                {/* Items */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {group.items.map(ex => {
+                    const alreadyAdded = editingSheet?.exercises.some(e => e.exerciseId === ex.id);
+                    return (
+                      <button
+                        key={ex.id}
+                        disabled={alreadyAdded}
+                        onClick={() => addExerciseToSheet(ex)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          width: '100%',
+                          padding: '12px 14px',
+                          background: alreadyAdded ? '#F2F2F7' : '#FFFFFF',
+                          borderRadius: '14px',
+                          border: '1px solid #E5E5EA',
+                          cursor: alreadyAdded ? 'default' : 'pointer',
+                          textAlign: 'left',
+                          opacity: alreadyAdded ? 0.6 : 1,
+                          transition: 'all 0.15s ease',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <div style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '8px',
+                          background: alreadyAdded ? '#E5E5EA' : '#F2F2F7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 16,
                         }}>
-                          Added
-                        </span>
-                      ) : (
-                        <Plus size={16} strokeWidth={2.4} color="#1C1C1E" />
-                      )}
-                    </button>
-                  );
-                })}
-            </div>
+                          {ex.icon}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1C1C1E' }}>{ex.name}</div>
+                          <div style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>
+                            {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
+                          </div>
+                        </div>
+                        {alreadyAdded ? (
+                          <span style={{ 
+                            fontSize: 9, 
+                            fontWeight: 700, 
+                            background: '#E5F6ED', 
+                            color: '#2E9E47', 
+                            padding: '2px 6px', 
+                            borderRadius: '100px', 
+                            letterSpacing: '0.03em',
+                            animation: 'sheetsAddPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                          }}>
+                            Added
+                          </span>
+                        ) : (
+                          <Plus size={16} strokeWidth={2.4} color="#1C1C1E" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
       </Modal>
 
       {/* ===== DELETE CONFIRMATION ===== */}
