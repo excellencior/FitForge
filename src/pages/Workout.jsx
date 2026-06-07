@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Check, ChevronDown, ChevronUp, ChevronRight, AlertTriangle, Timer, Trophy, X, Plus, Zap, Dumbbell, Activity, Shield, Footprints, Compass } from 'lucide-react';
+import { Play, Pause, RotateCcw, Check, ChevronDown, ChevronUp, ChevronRight, AlertTriangle, Timer, Trophy, X, Plus, Zap, Dumbbell, Activity, Shield, Footprints, Compass, CalendarCheck } from 'lucide-react';
 import { exercises as rawExercises, workoutTemplates, warmupRoutine, warmupSets, irradiationChecklist } from '../data/workouts';
 
 const legacyExerciseMap = {
@@ -53,6 +53,7 @@ const exercises = new Proxy(rawExercises, {
 import { getTodayWorkoutType, saveWorkoutLog, updatePR, getToday, getPRRecords, getActiveSheet, getWorkoutsByDate, getSettings } from '../utils/storage';
 import { useInputFocus, useDebounce } from '../utils/ux';
 import Modal from '../components/Modal';
+import WorkoutSheets from './WorkoutSheets';
 import './Workout.css';
 
 const playRestChime = (isFinal = false) => {
@@ -93,6 +94,8 @@ function Workout() {
   const handleInputFocus = useInputFocus();
   const debounceCompleteSet = useDebounce(600);
 
+
+
   // ── State ──
   const [mode, setMode] = useState('plan'); // 'plan' | 'active' | 'complete'
   const [workoutType, setWorkoutType] = useState('custom');
@@ -106,9 +109,22 @@ function Workout() {
   const [checkedWarmups, setCheckedWarmups] = useState({});
   const [expandedWarmupIdx, setExpandedWarmupIdx] = useState(null);
   const [usingActiveSheet, setUsingActiveSheet] = useState(false);
+  const [subTab, setSubTab] = useState('track'); // 'track' | 'routines'
+
 
   // Active workout
   const [currentExIdx, setCurrentExIdx] = useState(0);
+  const [checkedWarmupSets, setCheckedWarmupSets] = useState({});
+  const toggleWarmupSet = (key) => {
+    setCheckedWarmupSets(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+  
+  const [activeWarmupOpen, setActiveWarmupOpen] = useState(true);
+  
+  useEffect(() => {
+    setCheckedWarmupSets({});
+    setActiveWarmupOpen(true);
+  }, [currentExIdx, mode]);
   const [currentSet, setCurrentSet] = useState(1);
   const [repsInput, setRepsInput] = useState('');
   const [weightInput, setWeightInput] = useState('');
@@ -264,6 +280,8 @@ function Workout() {
   useEffect(() => {
     setTodayWorkouts(getWorkoutsByDate(getToday()));
   }, [mode]);
+
+
 
   // ── Timer logic ──
   useEffect(() => {
@@ -523,6 +541,7 @@ function Workout() {
   if (!template) return null;
 
   const workoutDoneToday = todayWorkouts.length > 0;
+  const hasExercises = template && template.exercises && template.exercises.length > 0;
 
   const timerProgress = restTotal > 0 ? ((restTotal - restTime) / restTotal) * 100 : 0;
   const circumference = 2 * Math.PI * 90;
@@ -544,7 +563,7 @@ function Workout() {
         className="page-content workout-page"
         style={{
           paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)',
-          background: '#F2F2F7',
+          background: 'var(--bg-secondary)',
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
@@ -575,23 +594,23 @@ function Workout() {
             style={{
               width: 64,
               height: 64,
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E5EA',
+              backgroundColor: 'var(--bg-card)',
+              border: '2px solid var(--border)',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 20px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+              boxShadow: 'var(--shadow-sm)'
             }}
           >
             <Trophy size={32} strokeWidth={2.2} style={{ color: '#FF9500' }} />
           </div>
           
-          <h1 style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: 24, fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
             Workout Complete
           </h1>
-          <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 20px', fontWeight: '500' }}>
+          <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 20px', fontWeight: '500' }}>
             {template.name} · {Math.round(totalVolume)}kg total volume
           </p>
 
@@ -607,7 +626,7 @@ function Workout() {
               {
                 label: 'Sets Done',
                 value: `${completionStats.actualSets} sets`,
-                icon: <Check size={18} strokeWidth={2.4} color="#34C759" />,
+                icon: <Check size={18} strokeWidth={2.4} color="var(--success)" />,
                 color: 'rgba(52,199,89,0.06)'
               },
               {
@@ -617,7 +636,7 @@ function Workout() {
                   const secs = completionStats.totalExerciseSecs % 60;
                   return mins === 0 ? `${secs}s` : `${mins}m ${secs}s`;
                 })(),
-                icon: <Dumbbell size={18} strokeWidth={2.4} color="#007AFF" />,
+                icon: <Dumbbell size={18} strokeWidth={2.4} color="var(--accent-blue)" />,
                 color: 'rgba(0,122,255,0.06)'
               },
               {
@@ -627,25 +646,25 @@ function Workout() {
                   const secs = completionStats.totalRestSecs % 60;
                   return mins === 0 ? `${secs}s` : `${mins}m ${secs}s`;
                 })(),
-                icon: <Timer size={18} strokeWidth={2.4} color="#FF9500" />,
+                icon: <Timer size={18} strokeWidth={2.4} color="var(--warning)" />,
                 color: 'rgba(255,149,0,0.06)'
               },
               {
                 label: 'Est. Calories',
                 value: `${completionStats.caloriesBurnt} kcal`,
-                icon: <Zap size={18} strokeWidth={2.4} color="#FF3B30" />,
+                icon: <Zap size={18} strokeWidth={2.4} color="var(--danger)" />,
                 color: 'rgba(255,59,48,0.06)'
               }
             ].map((stat, i) => (
               <div key={i} style={{
                 padding: 16,
-                background: '#FFFFFF',
-                border: '1px solid #E5E5EA',
+                background: 'var(--bg-card)',
+                border: '2px solid var(--border)',
                 borderRadius: 16,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.02)'
+                boxShadow: 'var(--shadow-sm)'
               }}>
                 <div style={{
                   background: stat.color,
@@ -660,15 +679,15 @@ function Workout() {
                   {stat.icon}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <span style={{ fontSize: 10, color: '#8E8E93', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stat.label}</span>
-                  <span style={{ fontSize: 15, fontWeight: '700', color: '#1C1C1E', marginTop: 2 }}>{stat.value}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stat.label}</span>
+                  <span style={{ fontSize: 15, fontWeight: '700', color: 'var(--text-primary)', marginTop: 2 }}>{stat.value}</span>
                 </div>
               </div>
             ))}
           </div>
 
           <div style={{ textAlign: 'left', marginBottom: 32 }}>
-            <h3 style={{ fontSize: 14, fontWeight: '700', color: '#1C1C1E', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
+            <h3 style={{ fontSize: 14, fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 12px', letterSpacing: '-0.01em' }}>
               Exercise Summary
             </h3>
             {template.exercises.map((exT, idx) => {
@@ -685,27 +704,28 @@ function Workout() {
                 <div 
                   key={idx} 
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    border: prHit ? '1.5px solid #FFE082' : '1px solid #E5E5EA',
+                    backgroundColor: 'var(--bg-card)',
+                    border: prHit ? '2.5px solid var(--warning)' : '2px solid var(--border)',
                     borderRadius: 14,
                     padding: '14px 16px',
                     marginBottom: 10,
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
+                    boxShadow: 'var(--shadow-sm)'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ color: '#636366' }}>
+                      <div style={{ color: 'var(--text-secondary)' }}>
                         {getExerciseIcon(exT.exerciseId, 16)}
                       </div>
-                      <span style={{ fontSize: 14, fontWeight: '700', color: '#1C1C1E' }}>{ex.nameShort}</span>
+                      <span style={{ fontSize: 14, fontWeight: '700', color: 'var(--text-primary)' }}>{ex.nameShort}</span>
                     </div>
                     {prHit && (
-                      <span style={{
+                      <span className="badge" style={{
                         display: 'inline-flex', alignItems: 'center', gap: 3,
-                        backgroundColor: '#FFF9E6', border: '1px solid #FFE082',
-                        color: '#B78103', padding: '2px 8px', borderRadius: 8,
-                        fontSize: 10, fontWeight: '700', letterSpacing: '0.3px'
+                        backgroundColor: 'var(--warning-light)', border: '2px solid var(--border)',
+                        color: 'var(--warning)', padding: '2px 8px', borderRadius: 8,
+                        fontSize: 10, fontWeight: '750', letterSpacing: '0.3px',
+                        boxShadow: 'var(--shadow-sm)'
                       }}>
                         <Trophy size={10} strokeWidth={2.5} /> PR
                       </span>
@@ -716,20 +736,20 @@ function Workout() {
                       <span 
                         key={si} 
                         style={{
-                          backgroundColor: '#F2F2F7',
+                          backgroundColor: 'var(--bg-tertiary)',
                           borderRadius: 8,
                           padding: '4px 10px',
                           fontSize: 12,
                           fontWeight: '600',
-                          color: '#1C1C1E'
+                          color: 'var(--text-primary)'
                         }}
                       >
                         {s.weight}kg × {s.reps}
                       </span>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, paddingTop: 8, borderTop: '1px solid #F2F2F7' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8E8E93', fontWeight: '600' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border-light)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-tertiary)', fontWeight: '600' }}>
                       <Timer size={11} strokeWidth={2.2} />
                       {(() => {
                         const actualRestSecs = exerciseRestTimes[exT.exerciseId] || 0;
@@ -740,7 +760,7 @@ function Workout() {
                       })()}
                     </span>
                     {exerciseDuration !== null && exerciseDuration > 0 && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8E8E93', fontWeight: '600' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-tertiary)', fontWeight: '600' }}>
                         <Dumbbell size={11} strokeWidth={2.2} /> ~{exerciseDuration} min
                       </span>
                     )}
@@ -760,8 +780,8 @@ function Workout() {
                 padding: '16px',
                 border: 'none',
                 borderRadius: 14,
-                backgroundColor: '#1C1C1E',
-                color: '#FFFFFF',
+                backgroundColor: 'var(--text-primary)',
+                color: 'var(--bg-primary)',
                 fontSize: 16,
                 fontWeight: '600',
                 cursor: 'pointer',
@@ -780,10 +800,10 @@ function Workout() {
                 gap: 8,
                 width: '100%',
                 padding: '16px',
-                border: '1.5px solid #FF9500',
+                border: '1.5px solid var(--warning)',
                 borderRadius: 14,
-                backgroundColor: '#FFFAF0',
-                color: '#E67E22',
+                backgroundColor: 'var(--warning-light)',
+                color: 'var(--warning)',
                 fontSize: 16,
                 fontWeight: '600',
                 cursor: 'pointer',
@@ -792,7 +812,7 @@ function Workout() {
               }}
               onClick={() => setShowGoAgainWarning(true)}
             >
-              <RotateCcw size={18} strokeWidth={2.2} style={{ color: '#FF9500' }} />
+              <RotateCcw size={18} strokeWidth={2.2} style={{ color: 'var(--warning)' }} />
               Go Again!
             </button>
           </div>
@@ -801,16 +821,16 @@ function Workout() {
           <Modal isOpen={showGoAgainWarning} onClose={() => setShowGoAgainWarning(false)} type="centered-alert">
             <div style={{
               width: 52, height: 52, borderRadius: '50%',
-              backgroundColor: '#FFF5EB',
+              backgroundColor: 'var(--warning-light)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 16px'
             }}>
-              <AlertTriangle size={26} strokeWidth={2.2} style={{ color: '#FF9500' }} />
+              <AlertTriangle size={26} strokeWidth={2.2} style={{ color: 'var(--warning)' }} />
             </div>
-            <h3 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 8px', letterSpacing: '-0.01em' }}>
+            <h3 style={{ fontSize: 18, fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 8px', letterSpacing: '-0.01em' }}>
               Train Again Today?
             </h3>
-            <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 24px', lineHeight: '1.5' }}>
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 24px', lineHeight: '1.5' }}>
               You've already completed a workout today. Training the same muscle groups again increases injury risk and may hinder recovery. Only proceed if targeting different muscles or doing a light session.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -822,7 +842,7 @@ function Workout() {
               </button>
               <button
                 className="btn btn-primary w-full"
-                style={{ backgroundColor: '#FF9500' }}
+                style={{ backgroundColor: 'var(--warning)' }}
                 onClick={() => { setShowGoAgainWarning(false); startWorkout(); }}
               >
                 Start Anyway
@@ -834,9 +854,6 @@ function Workout() {
     );
   }
 
-  // ════════════════════════════════════════════
-  // RENDER: Active Workout
-  // ════════════════════════════════════════════
   if (mode === 'active') {
     if (!template || !template.exercises || template.exercises.length === 0 || !template.exercises[currentExIdx]) {
       setTimeout(() => {
@@ -860,7 +877,7 @@ function Workout() {
         className="page-content workout-page"
         style={{
           paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)',
-          background: '#F2F2F7',
+          background: 'var(--bg-secondary)',
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
@@ -868,15 +885,16 @@ function Workout() {
         }}
       >
         {/* Progress bar */}
-        <div style={{ display: 'flex', gap: 4, padding: '16px 0 24px' }}>
+        <div style={{ display: 'flex', gap: 6, padding: '16px 0 24px' }}>
           {template.exercises.map((_, i) => (
             <div
               key={i}
               style={{
                 flex: 1,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: i < currentExIdx ? '#34C759' : i === currentExIdx ? '#007AFF' : '#E5E5EA',
+                height: 8,
+                borderRadius: 4,
+                border: '1.5px solid var(--border)',
+                backgroundColor: i < currentExIdx ? 'var(--success)' : i === currentExIdx ? 'var(--accent-purple)' : 'var(--bg-tertiary)',
                 transition: 'all 0.3s ease'
               }}
             />
@@ -886,12 +904,12 @@ function Workout() {
         <div className="active-workout" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
           {/* Current exercise */}
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', backgroundColor: '#FFFFFF', border: '1px solid #E5E5EA', color: '#1C1C1E', marginBottom: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', backgroundColor: 'var(--bg-card)', border: '2px solid var(--border)', color: 'var(--text-primary)', marginBottom: 12, boxShadow: 'var(--shadow-sm)' }}>
               {getExerciseIcon(exTemplate.exerciseId, 24)}
             </div>
-            <h2 style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', margin: '0 0 4px', letterSpacing: '-0.02em' }}>{ex.nameShort}</h2>
+            <h2 style={{ fontSize: 24, fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 4px', letterSpacing: '-0.02em' }}>{ex.nameShort}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13, color: '#8E8E93', fontWeight: '500' }}>{ex.muscle}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-tertiary)', fontWeight: '500' }}>{ex.muscle}</span>
               
               <div style={{
                 display: 'inline-flex',
@@ -899,27 +917,29 @@ function Workout() {
                 gap: 8,
                 marginTop: 6,
                 padding: '6px 12px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E5E5EA',
+                backgroundColor: 'var(--bg-card)',
+                border: '2px solid var(--border)',
                 borderRadius: 12,
                 fontSize: 12,
                 fontWeight: '600',
-                color: '#3A3A3C',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                color: 'var(--text-secondary)',
+                boxShadow: 'var(--shadow-sm)'
               }}>
                 <span>Target: {minSets}{maxSets && maxSets !== minSets ? `-${maxSets}` : ''} × {exTemplate.reps}{exTemplate.amrap ? '+' : ''} @ {getExerciseWeight(exTemplate.exerciseId, exTemplate.weight)}kg</span>
-                <span style={{ color: '#C7C7CC' }}>•</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>•</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Timer size={13} strokeWidth={2.4} style={{ color: '#007AFF' }} />
+                  <Timer size={13} strokeWidth={2.4} style={{ color: 'var(--accent-purple)' }} />
                   {exTemplate.restMinutes}m rest
                 </span>
               </div>
             </div>
           </div>
 
+
+
           {/* Set counter */}
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <span style={{ fontSize: 11, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '1px' }}>Set</span>
+            <span style={{ fontSize: 11, fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Set</span>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
               {Array.from({ length: Math.max(currentSet, minSets) }).map((_, i) => {
                 const isPast = i + 1 < currentSet;
@@ -938,23 +958,18 @@ function Workout() {
                       justifyContent: 'center',
                       fontSize: 15,
                       fontWeight: '700',
-                      border: isCurrent 
-                        ? '2px solid #007AFF' 
-                        : isPast 
-                          ? '2px solid #34C759' 
-                          : isBonus 
-                            ? '2.2px dashed #E5E5EA' 
-                            : '2px solid #E5E5EA',
+                      border: '2px solid var(--border)',
                       color: isCurrent 
-                        ? '#007AFF' 
+                        ? '#FFFFFF' 
                         : isPast 
-                          ? '#34C759' 
-                          : '#8E8E93',
+                          ? '#FFFFFF' 
+                          : 'var(--text-secondary)',
                       backgroundColor: isCurrent 
-                        ? '#E8F0FE' 
+                        ? 'var(--accent-purple)' 
                         : isPast 
-                          ? '#E8F5E9' 
-                          : '#FFFFFF',
+                          ? 'var(--success)' 
+                          : 'var(--bg-card)',
+                      boxShadow: (isCurrent || isPast) ? 'none' : 'var(--shadow-sm)',
                       transition: 'all 0.2s ease'
                     }}
                   >
@@ -972,8 +987,8 @@ function Workout() {
                   justifyContent: 'center',
                   fontSize: 14,
                   fontWeight: '700',
-                  border: '2px dashed #D1D1D6',
-                  color: '#AEAEB2',
+                  border: '2px dashed var(--border)',
+                  color: 'var(--text-tertiary)',
                   backgroundColor: 'transparent'
                 }}>
                   +
@@ -984,8 +999,8 @@ function Workout() {
               <span style={{
                 display: 'inline-block',
                 marginTop: 12,
-                backgroundColor: '#EDE7F6',
-                color: '#5856D6',
+                backgroundColor: 'var(--accent-purple-light)',
+                color: 'var(--accent-purple)',
                 fontSize: 12,
                 fontWeight: '700',
                 padding: '4px 12px',
@@ -1001,18 +1016,18 @@ function Workout() {
           {/* Rest Timer */}
           {isResting && (
             <div style={{ textAlign: 'center', margin: '24px 0', animation: 'fadeInUp 0.4s ease-out' }}>
-              <p style={{ fontSize: 12, fontWeight: '600', color: '#8E8E93', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '1px' }}>Rest Period</p>
+              <p style={{ fontSize: 12, fontWeight: '600', color: 'var(--text-tertiary)', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '1px' }}>Rest Period</p>
               <div className="circular-timer" style={{ width: 180, height: 180 }}>
                 <svg className="timer-svg" viewBox="0 0 200 200">
                   <circle
                     className="timer-bg-circle"
                     cx="100" cy="100" r="90"
-                    fill="none" stroke="#E5E5EA" strokeWidth="6"
+                    fill="none" stroke="var(--border)" strokeWidth="10"
                   />
                   <circle
                     className="timer-progress-circle"
                     cx="100" cy="100" r="90"
-                    fill="none" stroke="#007AFF" strokeWidth="6"
+                    fill="none" stroke="var(--accent-blue)" strokeWidth="10"
                     strokeLinecap="round"
                     strokeDasharray={circumference}
                     strokeDashoffset={strokeDashoffset}
@@ -1020,8 +1035,8 @@ function Workout() {
                   />
                 </svg>
                 <div className="timer-display">
-                  <span className="timer-time" style={{ fontSize: 36, fontWeight: '800', color: '#1C1C1E' }}>{formatTime(restTime)}</span>
-                  <span className="timer-total" style={{ fontSize: 12, color: '#8E8E93', marginTop: 2 }}>of {formatTime(restTotal)}</span>
+                  <span className="timer-time" style={{ fontSize: 36, fontWeight: '800', color: 'var(--text-primary)' }}>{formatTime(restTime)}</span>
+                  <span className="timer-total" style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>of {formatTime(restTotal)}</span>
                 </div>
               </div>
               
@@ -1031,14 +1046,14 @@ function Workout() {
                     width: 44,
                     height: 44,
                     borderRadius: '50%',
-                    border: '1px solid #E5E5EA',
-                    backgroundColor: '#FFFFFF',
+                    border: '2px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                    color: '#1C1C1E'
+                    boxShadow: 'var(--shadow-sm)',
+                    color: 'var(--text-primary)'
                   }}
                   onClick={toggleTimer} 
                   aria-label={timerPaused ? 'Resume' : 'Pause'}
@@ -1050,14 +1065,14 @@ function Workout() {
                     width: 44,
                     height: 44,
                     borderRadius: '50%',
-                    border: '1px solid #E5E5EA',
-                    backgroundColor: '#FFFFFF',
+                    border: '2px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                    color: '#1C1C1E'
+                    boxShadow: 'var(--shadow-sm)',
+                    color: 'var(--text-primary)'
                   }}
                   onClick={resetTimer} 
                   aria-label="Reset timer"
@@ -1069,13 +1084,13 @@ function Workout() {
                     height: 44,
                     padding: '0 20px',
                     borderRadius: 22,
-                    border: '1px solid #E5E5EA',
-                    backgroundColor: '#FFFFFF',
+                    border: '2px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
                     fontSize: 14,
-                    fontWeight: '600',
-                    color: '#007AFF',
+                    fontWeight: '700',
+                    color: 'var(--text-primary)',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                    boxShadow: 'var(--shadow-sm)'
                   }}
                   onClick={skipRest}
                 >
@@ -1089,24 +1104,25 @@ function Workout() {
           {!isResting && !showFlexChoice && (
             <div style={{ display: 'flex', gap: 12, margin: '24px 0' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: '600', color: '#8E8E93', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Weight (kg)</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: '600', color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Weight (kg)</label>
                 <input
                   type="number"
                   inputMode="decimal"
                   min="0"
-                  className="input-field"
+                  className="input"
                   style={{
                     fontSize: 24,
                     textAlign: 'center',
                     padding: 12,
                     borderRadius: 14,
-                    border: '1px solid #E5E5EA',
-                    backgroundColor: '#FFFFFF',
-                    color: '#1C1C1E',
+                    border: '2px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
                     fontWeight: '700',
                     height: 54,
                     boxSizing: 'border-box',
-                    cursor: 'text'
+                    cursor: 'text',
+                    boxShadow: 'var(--shadow-sm)'
                   }}
                   value={weightInput}
                   placeholder="0"
@@ -1114,26 +1130,27 @@ function Workout() {
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: '600', color: '#8E8E93', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Reps {isAmrap && <span style={{ color: '#5856D6', fontWeight: '700', fontSize: 10, textTransform: 'none', marginLeft: 4 }}>Max reps!</span>}
+                <label style={{ display: 'block', fontSize: 11, fontWeight: '600', color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Reps {isAmrap && <span style={{ color: 'var(--accent-purple)', fontWeight: '700', fontSize: 10, textTransform: 'none', marginLeft: 4 }}>Max reps!</span>}
                 </label>
                 <input
                   type="number"
                   inputMode="numeric"
                   min="0"
-                  className="input-field"
+                  className="input"
                   style={{
                     fontSize: 24,
                     textAlign: 'center',
                     padding: 12,
                     borderRadius: 14,
-                    border: '1px solid #E5E5EA',
-                    backgroundColor: '#FFFFFF',
-                    color: '#1C1C1E',
+                    border: '2px solid var(--border)',
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
                     fontWeight: '700',
                     height: 54,
                     boxSizing: 'border-box',
-                    cursor: 'text'
+                    cursor: 'text',
+                    boxShadow: 'var(--shadow-sm)'
                   }}
                   value={repsInput}
                   placeholder="0"
@@ -1146,6 +1163,7 @@ function Workout() {
           {/* Complete set / flex choice */}
           {!isResting && !showFlexChoice && (
             <button
+              className="btn btn-primary"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1153,12 +1171,13 @@ function Workout() {
                 gap: 8,
                 width: '100%',
                 padding: '16px',
-                border: 'none',
+                border: '2px solid var(--border)',
                 borderRadius: 14,
-                backgroundColor: isInputValid ? '#1C1C1E' : '#E5E5EA',
-                color: isInputValid ? '#FFFFFF' : '#8E8E93',
+                backgroundColor: isInputValid ? 'var(--accent-purple)' : 'var(--bg-tertiary)',
+                color: isInputValid ? '#FFFFFF' : 'var(--text-tertiary)',
+                boxShadow: isInputValid ? 'var(--shadow-sm)' : 'none',
                 fontSize: 16,
-                fontWeight: '600',
+                fontWeight: '700',
                 cursor: isInputValid ? 'pointer' : 'default',
                 transition: 'all 0.2s ease',
                 minHeight: 52,
@@ -1174,12 +1193,13 @@ function Workout() {
 
           {/* After min sets: choose to continue or move on */}
           {!isResting && showFlexChoice && (
-            <div style={{ marginTop: 16, padding: 16, backgroundColor: '#FFFFFF', borderRadius: 16, border: '1px solid #E5E5EA', textAlign: 'center' }}>
-              <div style={{ fontSize: 14, fontWeight: '600', color: '#1C1C1E', marginBottom: 12 }}>
+            <div style={{ marginTop: 16, padding: 16, backgroundColor: 'var(--bg-card)', borderRadius: 16, border: '2px solid var(--border)', boxShadow: 'var(--shadow-sm)', textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: '600', color: 'var(--text-primary)', marginBottom: 12 }}>
                 {minSets} sets done. Keep going?
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
+                  className="btn btn-secondary"
                   style={{
                     flex: 1,
                     display: 'flex',
@@ -1187,12 +1207,13 @@ function Workout() {
                     justifyContent: 'center',
                     gap: 6,
                     padding: '12px 16px',
-                    border: '1px solid #E5E5EA',
+                    border: '2px solid var(--border)',
                     borderRadius: 12,
-                    backgroundColor: '#F2F2F7',
-                    color: '#1C1C1E',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    color: 'var(--text-primary)',
+                    boxShadow: 'var(--shadow-sm)',
                     fontSize: 14,
-                    fontWeight: '600',
+                    fontWeight: '700',
                     cursor: 'pointer',
                     fontFamily: 'inherit'
                   }}
@@ -1212,6 +1233,7 @@ function Workout() {
                 </button>
                 {currentSet < maxSets && (
                   <button
+                    className="btn btn-primary"
                     style={{
                       flex: 1,
                       display: 'flex',
@@ -1219,12 +1241,13 @@ function Workout() {
                       justifyContent: 'center',
                       gap: 6,
                       padding: '12px 16px',
-                      border: '1px solid #E5E5EA',
+                      border: '2px solid var(--border)',
                       borderRadius: 12,
-                      backgroundColor: '#FFFFFF',
-                      color: '#34C759',
+                      backgroundColor: 'var(--accent-blue)',
+                      color: '#FFFFFF',
+                      boxShadow: 'var(--shadow-sm)',
                       fontSize: 14,
-                      fontWeight: '600',
+                      fontWeight: '700',
                       cursor: 'pointer',
                       fontFamily: 'inherit'
                     }}
@@ -1240,8 +1263,8 @@ function Workout() {
 
           {/* Logged sets */}
           {workoutLog.filter(l => l.exerciseId === exTemplate.exerciseId).length > 0 && (
-            <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #E5E5EA' }}>
-              <p style={{ fontSize: 11, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 10px' }}>Logged Sets</p>
+            <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
+              <p style={{ fontSize: 11, fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 10px' }}>Logged Sets</p>
               {workoutLog
                 .filter(l => l.exerciseId === exTemplate.exerciseId)
                 .map((l, i) => (
@@ -1252,15 +1275,16 @@ function Workout() {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '10px 14px',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E5EA',
+                      backgroundColor: 'var(--bg-card)',
+                      border: '2px solid var(--border)',
                       borderRadius: 10,
-                      marginBottom: 6
+                      marginBottom: 6,
+                      boxShadow: 'var(--shadow-sm)'
                     }}
                   >
-                    <span style={{ fontSize: 13, fontWeight: '600', color: '#8E8E93' }}>Set {l.set}</span>
-                    <span style={{ fontSize: 14, fontWeight: '700', color: '#1C1C1E' }}>{l.weight}kg × {l.reps} reps</span>
-                    <Check size={16} strokeWidth={2.5} style={{ color: '#34C759' }} />
+                    <span style={{ fontSize: 13, fontWeight: '600', color: 'var(--text-tertiary)' }}>Set {l.set}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{l.weight}kg × {l.reps} reps</span>
+                    <Check size={16} strokeWidth={2.5} style={{ color: 'var(--success)' }} />
                   </div>
                 ))}
             </div>
@@ -1268,6 +1292,7 @@ function Workout() {
 
           {/* Cancel workout button */}
           <button
+            className="btn btn-outline"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1276,12 +1301,13 @@ function Workout() {
               width: '100%',
               padding: '14px',
               marginTop: 24,
-              border: 'none',
+              border: '2px solid var(--border)',
               borderRadius: 12,
-              backgroundColor: 'transparent',
-              color: '#FF3B30',
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--danger)',
+              boxShadow: 'var(--shadow-sm)',
               fontSize: 14,
-              fontWeight: '600',
+              fontWeight: '700',
               cursor: 'pointer',
               minHeight: 44,
               fontFamily: 'inherit'
@@ -1294,8 +1320,8 @@ function Workout() {
 
           {/* Cancel confirmation dialog */}
           <Modal isOpen={showCancelConfirm} onClose={() => setShowCancelConfirm(false)} type="centered-alert">
-            <h3 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 8px', letterSpacing: '-0.01em' }}>Cancel Workout?</h3>
-            <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 20px', lineHeight: '1.4' }}>
+            <h3 style={{ fontSize: 18, fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 8px', letterSpacing: '-0.01em' }}>Cancel Workout?</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 20px', lineHeight: '1.4' }}>
               Your progress for this session will be lost.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1316,9 +1342,7 @@ function Workout() {
         </div>
       </div>
     );
-  }
-
-  // ════════════════════════════════════════════
+  }  // ════════════════════════════════════════════
   // RENDER: Plan View (default)
   // ════════════════════════════════════════════
   return (
@@ -1326,590 +1350,508 @@ function Workout() {
       className="page-content workout-page"
       style={{
         paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)',
-        background: '#F2F2F7',
+        background: 'var(--bg-secondary)',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box'
       }}
     >
-      {/* Safety Form Tip Banner */}
+      {/* Segmented Control */}
       <div 
-        style={{
-          backgroundColor: '#FFF5F5',
-          border: '1px solid #FEE2E2',
-          borderRadius: 14,
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          marginBottom: 20
-        }}
-      >
-        <AlertTriangle size={18} strokeWidth={2.2} style={{ color: '#E53E3E', flexShrink: 0 }} />
-        <span style={{ fontSize: 13, color: '#9B2C2C', lineHeight: '1.4', fontWeight: '500' }}>
-          <strong style={{ fontWeight: '700', marginRight: 4 }}>FORM FIRST:</strong>
-          Training near max has high injury risk. Never sacrifice form for weight.
-        </span>
-      </div>
-
-      {/* Workout Header */}
-      <div style={{ textAlign: 'center', padding: '16px 0 20px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: '800', color: '#1C1C1E', margin: '0 0 6px', letterSpacing: '-0.02em' }}>{template.name}</h1>
-        <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 12px', fontWeight: '500' }}>{todayFormatted()}</p>
-        <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-          {!usingActiveSheet && (
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: '#E8F0FE',
-              color: '#007AFF',
-              padding: '6px 14px',
-              borderRadius: 20,
-              fontSize: 12,
-              fontWeight: '600'
-            }}>
-              <Activity size={13} strokeWidth={2.5} /> {workoutType === 'A' ? 'Push Day' : 'Pull Day'}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Workout Completed Banner */}
-      {workoutDoneToday && (
-        <div 
-          style={{
-            backgroundColor: '#E8F5E9',
-            border: '1px solid #C8E6C9',
-            borderRadius: 14,
-            padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            marginBottom: 16
-          }}
-        >
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            backgroundColor: '#FFFFFF', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-          }}>
-            <Check size={18} strokeWidth={2.5} style={{ color: '#2E7D32' }} />
-          </div>
-          <div>
-            <span style={{ fontSize: 14, fontWeight: '700', color: '#2E7D32', display: 'block' }}>Today's Workout Complete</span>
-            <span style={{ fontSize: 12, color: '#4CAF50', fontWeight: '500' }}>
-              {todayWorkouts.length} session{todayWorkouts.length > 1 ? 's' : ''} logged today
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Warm-up Section */}
-      <div 
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: 16,
-          border: '1px solid #E5E5EA',
-          padding: '20px',
-          marginBottom: '16px',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
+        className="tab-bar" 
+        style={{ 
+          display: 'flex', 
+          gap: 8, 
+          padding: '6px', 
+          background: 'var(--bg-card)', 
+          borderRadius: 16, 
+          marginBottom: 20, 
+          border: '2px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)'
         }}
       >
         <button 
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            padding: 0
-          }}
-          onClick={() => setWarmupOpen(p => !p)}
+          className={`tab-item ${subTab === 'track' ? 'active' : ''}`}
+          onClick={() => setSubTab('track')}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
-            <div style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              backgroundColor: '#F2F2F7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#636366'
-            }}>
-              <Activity size={20} strokeWidth={2.2} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: '700', color: '#1C1C1E', margin: 0 }}>RAMP Warm-up</h3>
-              <p style={{ fontSize: 12, color: '#8E8E93', margin: '2px 0 0' }}>7 movements • ~10 min</p>
-            </div>
-          </div>
-          {warmupOpen ? <ChevronUp size={20} style={{ color: '#AEAEB2' }} /> : <ChevronDown size={20} style={{ color: '#AEAEB2' }} />}
+          Track Workout
         </button>
-
-        {warmupOpen && (
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #E5E5EA' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {warmupRoutine.map((item, i) => {
-                const done = !!checkedWarmups[i];
-                const isWarmupExpanded = expandedWarmupIdx === i;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      background: done ? '#E8F5E930' : '#FFFFFF',
-                      borderRadius: 14,
-                      border: '1px solid #E5E5EA',
-                      transition: 'all 0.2s ease',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                  >
-                    {/* Header Row */}
-                    <div
-                      onClick={() => setExpandedWarmupIdx(isWarmupExpanded ? null : i)}
-                      style={{
-                        cursor: 'pointer',
-                        padding: '12px 14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        userSelect: 'none'
-                      }}
-                    >
-                      {/* Checkbox badge circle */}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); toggleWarmup(i); }}
-                        style={{
-                          border: 'none',
-                          cursor: 'pointer',
-                          width: 26,
-                          height: 26,
-                          borderRadius: '50%',
-                          flexShrink: 0,
-                          background: done ? '#34C759' : '#F2F2F7',
-                          color: done ? '#FFFFFF' : '#636366',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {done ? <Check size={14} strokeWidth={2.8} /> : getWarmupIcon(i)}
-                      </button>
-
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, paddingLeft: 2 }}>
-                        <span style={{
-                          fontSize: 13.5,
-                          fontWeight: '600',
-                          textDecoration: done ? 'line-through' : 'none',
-                          color: done ? '#AEAEB2' : '#1C1C1E',
-                          transition: 'all 0.2s ease',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>{item.name}</span>
-                        <span style={{ fontSize: 11.5, color: done ? '#AEAEB2' : '#8E8E93', marginTop: 2 }}>{item.duration}</span>
-                      </div>
-                      
-                      <div style={{ display: 'flex', alignItems: 'center', color: '#AEAEB2' }}>
-                        {isWarmupExpanded ? <ChevronUp size={16} strokeWidth={2.4} /> : <ChevronDown size={16} strokeWidth={2.4} />}
-                      </div>
-                    </div>
-
-                    {/* Accordion instructions */}
-                    {isWarmupExpanded && (
-                      <div style={{
-                        padding: '0 14px 14px 52px',
-                        fontSize: 12.5,
-                        lineHeight: 1.45,
-                        color: '#636366',
-                        borderTop: '0.5px solid #F2F2F7',
-                        background: '#F9F9FB',
-                        paddingTop: 10
-                      }}>
-                        {item.instructions}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Barbell Warmup Sets Calculator */}
-            {(() => {
-              const activeExTemplate = template.exercises[currentExIdx];
-              const activeExName = activeExTemplate ? (exercises[activeExTemplate.exerciseId]?.nameShort || activeExTemplate.exerciseId) : '';
-              const activeWorkingWeight = activeExTemplate ? getExerciseWeight(activeExTemplate.exerciseId, activeExTemplate.weight) : 0;
-
-              return (
-                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #E5E5EA' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <h4 style={{ fontSize: 14, fontWeight: '700', color: '#1C1C1E', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Timer size={15} strokeWidth={2.2} style={{ color: '#007AFF' }} /> Ramp-up Sets
-                    </h4>
-                    {activeExTemplate && activeWorkingWeight > 0 && (
-                      <span style={{ fontSize: 11, fontWeight: '700', color: '#8E8E93', background: '#F2F2F7', padding: '3px 8px', borderRadius: 8 }}>
-                        Calculated for {activeExName} @ {activeWorkingWeight}kg
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #E5E5EA', backgroundColor: '#FFFFFF' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.6fr 1.3fr', padding: '8px 12px', backgroundColor: '#F2F2F7', fontSize: 11, fontWeight: '600', color: '#636366', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      <span>Set</span>
-                      <span>Load</span>
-                      <span>Reps</span>
-                      <span>Purpose</span>
-                    </div>
-                    {warmupSets.map((s, i) => {
-                      const pct = parseInt(s.load) / 100;
-                      const calculatedWeight = activeWorkingWeight > 0 ? Math.round((activeWorkingWeight * pct) / 2.5) * 2.5 : 0;
-                      return (
-                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.6fr 1.3fr', padding: '10px 12px', fontSize: 13, borderTop: '1px solid #E5E5EA', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
-                          <span style={{ fontWeight: '600', color: '#1C1C1E' }}>{s.label}</span>
-                          <span style={{ fontWeight: '700', color: '#007AFF' }}>
-                            {calculatedWeight > 0 ? `${calculatedWeight} kg` : s.load}
-                            {calculatedWeight > 0 && <span style={{ fontSize: 10, color: '#8E8E93', fontWeight: '500', marginLeft: 4 }}>({s.load})</span>}
-                          </span>
-                          <span style={{ color: '#636366' }}>×{s.reps}</span>
-                          <span style={{ fontSize: 11.5, color: '#8E8E93' }}>{s.purpose}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
+        <button 
+          className={`tab-item ${subTab === 'routines' ? 'active' : ''}`}
+          onClick={() => setSubTab('routines')}
+        >
+          Routine Templates
+        </button>
       </div>
 
-      {/* Exercise List */}
-      <div style={{ marginTop: 8, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 16px', letterSpacing: '-0.01em' }}>Exercises</h2>
-        {template.exercises.map((exT, idx) => {
-          const ex = exercises[exT.exerciseId] || { nameShort: exT.exerciseId, muscle: '', icon: '', formTips: [], warnings: [] };
-          const weight = getExerciseWeight(exT.exerciseId, exT.weight);
-          const isExpanded = expandedExercise === idx;
-          const isAmrapSet = exT.amrap;
+      {subTab === 'routines' ? (
+        <WorkoutSheets isEmbedded={true} />
+      ) : (
+        <>
+          {/* Safety Form Tip Banner */}
+          <div 
+            style={{
+              backgroundColor: 'var(--danger-light)',
+              border: '2px solid var(--border)',
+              borderRadius: 14,
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 20,
+              boxShadow: 'var(--shadow-sm)'
+            }}
+          >
+            <AlertTriangle size={18} strokeWidth={2.2} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+            <span style={{ fontSize: 13, color: 'var(--danger)', lineHeight: '1.4', fontWeight: '700' }}>
+              <strong style={{ fontWeight: '800', marginRight: 4 }}>FORM FIRST:</strong>
+              Training near max has high injury risk. Never sacrifice form for weight.
+            </span>
+          </div>
 
-          return (
-            <div 
-              key={idx} 
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 16,
-                border: '1px solid #E5E5EA',
-                padding: '16px',
-                marginBottom: '16px',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
-                position: 'relative'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    backgroundColor: '#F2F2F7',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#636366'
-                  }}>
-                    {getExerciseIcon(exT.exerciseId, 20)}
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: 16, fontWeight: '700', color: '#1C1C1E', margin: 0, letterSpacing: '-0.01em' }}>{ex.nameShort}</h4>
-                    <span style={{ fontSize: 12, color: '#8E8E93' }}>{ex.muscle}</span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 17, fontWeight: '800', color: '#1C1C1E', letterSpacing: '-0.02em' }}>
-                      {exT.minSets || exT.sets || 3}{exT.maxSets ? `-${exT.maxSets}` : ''}×{exT.reps}
-                    </span>
-                    {isAmrapSet && (
-                      <span style={{
-                        backgroundColor: '#EDE7F6',
-                        color: '#5856D6',
-                        fontSize: 10,
-                        fontWeight: '700',
-                        padding: '2px 6px',
-                        borderRadius: 6,
-                        letterSpacing: 0.5,
-                        textTransform: 'uppercase'
-                      }}>
-                        AMRAP
-                      </span>
-                    )}
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: '700', color: '#007AFF' }}>{weight} kg</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8E8E93' }}>
-                    <Timer size={11} strokeWidth={2.2} /> {exT.restMinutes}m rest
-                  </span>
-                </div>
-              </div>
-
-              {exT.notes && (
-                <p style={{
-                  fontSize: 12,
-                  color: '#636366',
-                  margin: '12px 0 0',
-                  padding: '8px 12px',
-                  backgroundColor: '#F2F2F7',
-                  borderRadius: 10,
-                  fontStyle: 'italic',
-                  lineHeight: '1.4'
-                }}>{exT.notes}</p>
-              )}
-
-              <button
-                style={{
+          {/* Workout Header */}
+          <div style={{ textAlign: 'center', padding: '16px 0 20px' }}>
+            <h1 style={{ fontSize: 24, fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: '-0.02em' }}>{template.name}</h1>
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 12px', fontWeight: '500' }}>{todayFormatted()}</p>
+            <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+              {!usingActiveSheet && (
+                <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 4,
-                  marginTop: 12,
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: '600',
-                  color: '#007AFF',
-                  padding: '4px 0',
-                  fontFamily: 'inherit'
-                }}
-                onClick={() => setExpandedExercise(isExpanded ? null : idx)}
-              >
-                {isExpanded ? 'Hide' : 'Show'} Form Tips
-                {isExpanded ? <ChevronUp size={14} strokeWidth={2.5} /> : <ChevronDown size={14} strokeWidth={2.5} />}
-              </button>
-
-              {isExpanded && (
-                <div style={{
-                  marginTop: 12,
-                  paddingTop: 12,
-                  borderTop: '1px solid #E5E5EA'
+                  gap: 6,
+                  backgroundColor: 'var(--accent-blue-light)',
+                  color: 'var(--text-primary)',
+                  border: '2px solid var(--border)',
+                  boxShadow: 'var(--shadow-sm)',
+                  padding: '6px 14px',
+                  borderRadius: 20,
+                  fontSize: 12,
+                  fontWeight: '700'
                 }}>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 12px 0' }}>
-                    {ex.formTips.map((tip, ti) => (
-                      <li key={ti} style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 8,
-                        fontSize: 13,
-                        color: '#1C1C1E',
-                        padding: '4px 0',
-                        lineHeight: '1.4'
-                      }}>
-                        <Check size={14} strokeWidth={2.5} style={{ color: '#34C759', flexShrink: 0, marginTop: 2 }} />
-                        <span>{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {ex.warnings.length > 0 && (
+                  <Activity size={13} strokeWidth={2.5} /> {workoutType === 'A' ? 'Push Day' : 'Pull Day'}
+                </span>
+              )}
+            </div>
+          </div>
+
+
+          {/* Workout Completed Banner */}
+          {workoutDoneToday && (
+            <div 
+              style={{
+                backgroundColor: 'var(--success-light)',
+                border: '2px solid var(--border)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 16,
+                boxShadow: 'var(--shadow-sm)'
+              }}
+            >
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                backgroundColor: 'var(--bg-card)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                border: '2px solid var(--border)',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <Check size={18} strokeWidth={2.5} style={{ color: 'var(--success)' }} />
+              </div>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: '800', color: 'var(--success)', display: 'block' }}>Today's Workout Complete</span>
+                <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: '600' }}>
+                  {todayWorkouts.length} session{todayWorkouts.length > 1 ? 's' : ''} logged today
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Warm-up Section */}
+          <div 
+            className="card"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderRadius: 16,
+              border: '2px solid var(--border)',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: 'var(--shadow-md)'
+            }}
+          >
+            <button 
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                padding: 0
+              }}
+              onClick={() => setWarmupOpen(p => !p)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+                <div style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  backgroundColor: 'var(--bg-tertiary)',
+                  border: '2px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <Activity size={20} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>RAMP Warm-up</h3>
+                  <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: '2px 0 0' }}>7 movements • ~10 min</p>
+                </div>
+              </div>
+              {warmupOpen ? <ChevronUp size={20} style={{ color: 'var(--text-tertiary)' }} /> : <ChevronDown size={20} style={{ color: 'var(--text-tertiary)' }} />}
+            </button>
+
+            {warmupOpen && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {warmupRoutine.map((item, i) => {
+                    const done = !!checkedWarmups[i];
+                    const isWarmupExpanded = expandedWarmupIdx === i;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          background: done ? 'var(--success-light)' : 'var(--bg-card)',
+                          borderRadius: 14,
+                          border: '2px solid var(--border)',
+                          boxShadow: 'var(--shadow-sm)',
+                          transition: 'all 0.2s ease',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        {/* Header Row */}
+                        <div
+                          onClick={() => setExpandedWarmupIdx(isWarmupExpanded ? null : i)}
+                          style={{
+                            cursor: 'pointer',
+                            padding: '12px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            userSelect: 'none'
+                          }}
+                        >
+                          {/* Checkbox badge circle */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleWarmup(i); }}
+                            style={{
+                              border: '2px solid var(--border)',
+                              boxShadow: done ? 'none' : 'var(--shadow-sm)',
+                              cursor: 'pointer',
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              flexShrink: 0,
+                              background: done ? 'var(--success)' : 'var(--bg-tertiary)',
+                              color: done ? '#FFFFFF' : 'var(--text-secondary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {done ? <Check size={14} strokeWidth={2.8} /> : getWarmupIcon(i)}
+                          </button>
+
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, paddingLeft: 2 }}>
+                            <span style={{
+                              fontSize: 13.5,
+                              fontWeight: '600',
+                              textDecoration: done ? 'line-through' : 'none',
+                              color: done ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                              transition: 'all 0.2s ease',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>{item.name}</span>
+                            <span style={{ fontSize: 11.5, color: done ? 'var(--text-tertiary)' : 'var(--text-tertiary)', marginTop: 2 }}>{item.duration}</span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-tertiary)' }}>
+                            {isWarmupExpanded ? <ChevronUp size={16} strokeWidth={2.4} /> : <ChevronDown size={16} strokeWidth={2.4} />}
+                          </div>
+                        </div>
+
+                        {/* Accordion instructions */}
+                        {isWarmupExpanded && (
+                          <div style={{
+                            padding: '0 14px 14px 52px',
+                            fontSize: 12.5,
+                            lineHeight: 1.45,
+                            color: 'var(--text-secondary)',
+                            borderTop: '2px solid var(--border)',
+                            background: 'var(--bg-secondary)',
+                            paddingTop: 10
+                          }}>
+                            {item.instructions}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Exercise List */}
+          <div style={{ marginTop: 8, marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 16px', letterSpacing: '-0.01em' }}>Exercises</h2>
+            {template.exercises.map((exT, idx) => {
+              const ex = exercises[exT.exerciseId] || { nameShort: exT.exerciseId, muscle: '', icon: '', formTips: [], warnings: [] };
+              const weight = getExerciseWeight(exT.exerciseId, exT.weight);
+              const isExpanded = expandedExercise === idx;
+              const isAmrapSet = exT.amrap;
+
+              return (
+                <div 
+                  key={idx} 
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderRadius: 16,
+                    border: '2px solid var(--border)',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    boxShadow: 'var(--shadow-md)',
+                    position: 'relative'
+                  }}
+                >
+                  <div 
+                    onClick={() => setExpandedExercise(isExpanded ? null : idx)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', userSelect: 'none' }}
+                  >
                     <div style={{
-                      padding: 10,
-                      backgroundColor: '#FFF5F5',
-                      border: '1px solid #FEE2E2',
-                      borderRadius: 10
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      backgroundColor: 'var(--bg-tertiary)',
+                      color: 'var(--text-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 20
                     }}>
-                      {ex.warnings.map((w, wi) => (
-                        <p key={wi} style={{
-                          fontSize: 12,
-                          color: '#9B2C2C',
-                          margin: 0,
-                          padding: '2px 0',
-                          lineHeight: '1.4',
-                          fontWeight: '500'
-                        }}>
-                          {w.replace(/⚠️\s*/, '')}
-                        </p>
-                      ))}
+                      {ex.icon || '💪'}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 15, fontWeight: '700', color: 'var(--text-primary)', display: 'block', letterSpacing: '-0.01em' }}>{ex.nameShort}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, display: 'block' }}>
+                        {exT.sets || 3} sets × {exT.reps}{isAmrapSet ? '+' : ''} reps · {weight > 0 ? `${weight} kg` : 'Bodyweight'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-tertiary)' }}>
+                      {isExpanded ? <ChevronUp size={18} strokeWidth={2.4} /> : <ChevronDown size={18} strokeWidth={2.4} />}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid var(--border-light)' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                        <span className="badge" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>Muscle: {ex.muscle || 'Full Body'}</span>
+                        {isAmrapSet && <span className="badge" style={{ backgroundColor: 'var(--warning-light)', color: 'var(--warning)', fontWeight: 700 }}>AMRAP Last Set</span>}
+                      </div>
+
+                      {ex.formTips && ex.formTips.length > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <span style={{ fontSize: 11, fontWeight: '700', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>Form Checklist</span>
+                          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                            {ex.formTips.map((tip, i) => <li key={i}>{tip}</li>)}
+                          </ul>
+                        </div>
+                      )}
+
+                      {ex.warnings && ex.warnings.length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: '700', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>Injury Warnings</span>
+                          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--danger)', lineHeight: 1.5 }}>
+                            {ex.warnings.map((warn, i) => <li key={i}>{warn}</li>)}
+                          </ul>
+                        </div>
+                      )}
+
+                      {weight > 0 && (
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-light)' }}>
+                          <span style={{ fontSize: 11, fontWeight: '700', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Ramp-up Sets Checklist</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {warmupSets.map((s, i) => {
+                              const pct = parseInt(s.load) / 100;
+                              const calculatedWeight = Math.round((weight * pct) / 2.5) * 2.5;
+                              const setKey = `${exT.exerciseId}_${i}`;
+                              const isChecked = !!checkedWarmupSets[setKey];
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={(e) => { e.stopPropagation(); toggleWarmupSet(setKey); }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    padding: '8px 12px',
+                                    borderRadius: 10,
+                                    border: '2px solid var(--border)',
+                                    backgroundColor: isChecked ? 'var(--success-light)' : 'var(--bg-card)',
+                                    boxShadow: isChecked ? 'none' : 'var(--shadow-sm)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    userSelect: 'none'
+                                  }}
+                                >
+                                  {/* Custom Checkbox */}
+                                  <div
+                                    style={{
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: '50%',
+                                      border: isChecked ? 'none' : '1.5px solid var(--border)',
+                                      backgroundColor: isChecked ? 'var(--success)' : 'transparent',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#FFFFFF',
+                                      flexShrink: 0,
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                  >
+                                    {isChecked && <Check size={12} strokeWidth={3} />}
+                                  </div>
+
+                                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
+                                      <span style={{
+                                        fontSize: 13,
+                                        fontWeight: '600',
+                                        color: isChecked ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                                        textDecoration: isChecked ? 'line-through' : 'none',
+                                        transition: 'all 0.2s ease'
+                                      }}>
+                                        {calculatedWeight} kg
+                                      </span>
+                                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                        ({s.load})
+                                      </span>
+                                      <span style={{
+                                        fontSize: 13,
+                                        color: isChecked ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+                                        textDecoration: isChecked ? 'line-through' : 'none'
+                                      }}>
+                                        × {s.reps} reps
+                                      </span>
+                                    </div>
+                                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 4 }}>
+                                      {s.purpose}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
 
-      {/* Irradiation Checklist */}
-      <div 
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: 16,
-          border: '1px solid #E5E5EA',
-          padding: '20px',
-          marginBottom: '16px',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
-        }}
-      >
-        <button 
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            padding: 0
-          }}
-          onClick={() => setIrradiationOpen(p => !p)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
-            <div style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              backgroundColor: '#F2F2F7',
+          {/* Start Workout / Go Again Button */}
+          <button
+            disabled={!hasExercises}
+            className="btn btn-primary"
+            style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#636366'
+              gap: 8,
+              width: '100%',
+              padding: '16px',
+              border: '2px solid var(--border)',
+              borderRadius: 14,
+              background: !hasExercises ? 'var(--bg-tertiary)' : (workoutDoneToday ? 'var(--warning-light)' : 'var(--accent-purple)'),
+              color: !hasExercises ? 'var(--text-tertiary)' : (workoutDoneToday ? 'var(--warning)' : '#FFFFFF'),
+              fontSize: 16,
+              fontWeight: '700',
+              cursor: !hasExercises ? 'not-allowed' : 'pointer',
+              boxShadow: !hasExercises ? 'none' : 'var(--shadow-sm)',
+              transition: 'all 0.2s ease',
+              minHeight: 52,
+              marginTop: 24,
+              fontFamily: 'inherit',
+              letterSpacing: '-0.01em'
+            }}
+            onClick={workoutDoneToday ? () => setShowGoAgainWarning(true) : startWorkout}
+          >
+            {workoutDoneToday ? (
+              <>
+                <RotateCcw size={18} strokeWidth={2.2} style={{ color: !hasExercises ? 'var(--text-tertiary)' : 'var(--warning)' }} />
+                Go Again!
+              </>
+            ) : (
+              <>
+                <Play size={18} strokeWidth={2.2} style={{ color: !hasExercises ? 'var(--text-tertiary)' : '#FFFFFF' }} />
+                Start Workout
+              </>
+            )}
+          </button>
+
+          {/* Go Again Warning Modal */}
+          <Modal isOpen={showGoAgainWarning} onClose={() => setShowGoAgainWarning(false)} type="centered-alert">
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%',
+              backgroundColor: 'var(--warning-light)',
+              border: '2px solid var(--border)',
+              boxShadow: 'var(--shadow-sm)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px'
             }}>
-              <Shield size={20} strokeWidth={2.2} />
+              <AlertTriangle size={26} strokeWidth={2.2} style={{ color: 'var(--warning)' }} />
             </div>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: '700', color: '#1C1C1E', margin: 0 }}>Irradiation Checklist</h3>
-              <p style={{ fontSize: 12, color: '#8E8E93', margin: '2px 0 0' }}>7-step tension protocol</p>
+            <h3 style={{ fontSize: 18, fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 8px', letterSpacing: '-0.01em' }}>
+              Train Again Today?
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '0 0 24px', lineHeight: '1.5' }}>
+              You've already completed a workout today. Training the same muscle groups again increases injury risk and may hinder recovery. Only proceed if targeting different muscles or doing a light session.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                className="btn btn-secondary w-full"
+                style={{ border: '2px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+                onClick={() => setShowGoAgainWarning(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary w-full"
+                style={{ border: '2px solid var(--border)', boxShadow: 'var(--shadow-sm)', backgroundColor: 'var(--warning)' }}
+                onClick={() => { setShowGoAgainWarning(false); startWorkout(); }}
+              >
+                Start Anyway
+              </button>
             </div>
-          </div>
-          {irradiationOpen ? <ChevronUp size={20} style={{ color: '#AEAEB2' }} /> : <ChevronDown size={20} style={{ color: '#AEAEB2' }} />}
-        </button>
-
-        {irradiationOpen && (
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #E5E5EA' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {irradiationChecklist.map((item) => {
-                const done = !!checkedSteps[item.step];
-                return (
-                  <label 
-                    key={item.step} 
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '10px 0',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #F2F2F7',
-                      minHeight: 44
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                      <div style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: '50%',
-                        backgroundColor: done ? '#E8F5E9' : '#F2F2F7',
-                        color: done ? '#2E7D32' : '#636366',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 11,
-                        fontWeight: '700',
-                        marginRight: 12,
-                        flexShrink: 0,
-                        border: done ? '1.5px solid #2E7D32' : '1.5px solid transparent',
-                        transition: 'all 0.2s ease'
-                      }}>
-                        {done ? <Check size={14} strokeWidth={3} /> : `0${item.step}`}
-                      </div>
-                      <span style={{
-                        fontSize: 14,
-                        fontWeight: '500',
-                        color: done ? '#AEAEB2' : '#1C1C1E',
-                        textDecoration: done ? 'line-through' : 'none',
-                        transition: 'all 0.2s ease'
-                      }}>{item.text}</span>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Start Workout / Go Again Button */}
-      <button 
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          width: '100%',
-          padding: '16px',
-          border: workoutDoneToday ? '1.5px solid #FF9500' : '1px solid #E5E5EA',
-          borderRadius: 14,
-          backgroundColor: workoutDoneToday ? '#FFFAF0' : '#FFFFFF',
-          color: workoutDoneToday ? '#E67E22' : '#1C1C1E',
-          fontSize: 16,
-          fontWeight: '600',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-          transition: 'all 0.2s ease',
-          minHeight: 50,
-          marginTop: 24,
-          fontFamily: 'inherit'
-        }}
-        onClick={workoutDoneToday ? () => setShowGoAgainWarning(true) : startWorkout}
-      >
-        {workoutDoneToday ? (
-          <>
-            <RotateCcw size={18} strokeWidth={2.2} style={{ color: '#FF9500' }} />
-            Go Again!
-          </>
-        ) : (
-          <>
-            <Play size={18} strokeWidth={2.2} style={{ color: '#007AFF' }} />
-            Start Workout
-          </>
-        )}
-      </button>
-
-      {/* Go Again Warning Modal */}
-      <Modal isOpen={showGoAgainWarning} onClose={() => setShowGoAgainWarning(false)} type="centered-alert">
-        <div style={{
-          width: 52, height: 52, borderRadius: '50%',
-          backgroundColor: '#FFF5EB',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 16px'
-        }}>
-          <AlertTriangle size={26} strokeWidth={2.2} style={{ color: '#FF9500' }} />
-        </div>
-        <h3 style={{ fontSize: 18, fontWeight: '700', color: '#1C1C1E', margin: '0 0 8px', letterSpacing: '-0.01em' }}>
-          Train Again Today?
-        </h3>
-        <p style={{ fontSize: 13, color: '#8E8E93', margin: '0 0 24px', lineHeight: '1.5' }}>
-          You've already completed a workout today. Training the same muscle groups again increases injury risk and may hinder recovery. Only proceed if targeting different muscles or doing a light session.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button
-            className="btn btn-secondary w-full"
-            onClick={() => setShowGoAgainWarning(false)}
-          >
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary w-full"
-            style={{ backgroundColor: '#FF9500' }}
-            onClick={() => { setShowGoAgainWarning(false); startWorkout(); }}
-          >
-            Start Anyway
-          </button>
-        </div>
-      </Modal>
+          </Modal>
+        </>
+      )}
 
       {/* Bottom spacer for nav */}
       <div className="bottom-spacer" style={{ height: 24 }} />

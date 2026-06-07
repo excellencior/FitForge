@@ -47,6 +47,21 @@
   animation: slideDown 0.35s ease-out forwards;
 }
 
+/* Collapsible Height Grid transition */
+.collapsible-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-short) var(--ease-out);
+  width: 100%;
+}
+.collapsible-wrapper.open {
+  grid-template-rows: 1fr;
+}
+.collapsible-content {
+  overflow: hidden;
+  min-height: 0;
+}
+
 /* ── Safety Banner ── */
 .safety-banner {
   background: var(--danger-light);
@@ -1257,7 +1272,7 @@
   left: var(--x, 50%);
   width: 10px;
   height: 10px;
-  background: var(--color, #007AFF);
+  background: var(--color, var(--accent-blue));
   border-radius: 2px;
   animation: confettiFall var(--duration, 3s) var(--delay, 0s) ease-in forwards;
 }

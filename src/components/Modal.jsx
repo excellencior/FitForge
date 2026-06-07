@@ -1,17 +1,51 @@
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 export default function Modal({ isOpen, onClose, title, type = 'bottom-sheet', children }) {
-  if (!isOpen) return null;
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+    }
+  }
+
+  useEffect(() => {
+    if (isClosing && shouldRender) {
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 240);
+      return () => clearTimeout(timer);
+    }
+  }, [isClosing, shouldRender]);
+
+  if (!shouldRender) return null;
 
   const isAlert = type === 'centered-alert';
 
-  return (
+  const overlayClass = isAlert 
+    ? (isClosing ? 'modal-alert-overlay modal-alert-overlay-closing' : 'modal-alert-overlay') 
+    : (isClosing ? 'modal-overlay modal-overlay-closing' : 'modal-overlay');
+
+  const contentClass = isAlert 
+    ? (isClosing ? 'modal-alert-content modal-alert-content-closing' : 'modal-alert-content') 
+    : (isClosing ? 'modal-content modal-content-closing' : 'modal-content');
+
+  return createPortal(
     <div 
-      className={isAlert ? 'modal-alert-overlay' : 'modal-overlay'} 
+      className={overlayClass} 
       onClick={onClose}
     >
       <div 
-        className={isAlert ? 'modal-alert-content' : 'modal-content'} 
+        className={contentClass} 
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -23,12 +57,11 @@ export default function Modal({ isOpen, onClose, title, type = 'bottom-sheet', c
             background: 'var(--bg-secondary)',
             zIndex: 100,
             margin: '-24px -20px 20px -20px',
-            padding: '24px 20px 0 20px',
+            padding: '20px 20px 20px 20px',
             borderTopLeftRadius: '22px',
             borderTopRightRadius: '22px',
           }}>
-            <div className="modal-handle" />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               {title && (
                 <h2 style={{
                   fontSize: 20,
@@ -82,6 +115,7 @@ export default function Modal({ isOpen, onClose, title, type = 'bottom-sheet', c
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

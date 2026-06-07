@@ -26,7 +26,6 @@ function LoadingSpinner() {
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Home' },
-  { path: '/sheets', icon: ClipboardList, label: 'Sheets' },
   { path: '/workout', icon: Dumbbell, label: 'Workout' },
   { path: '/diet', icon: UtensilsCrossed, label: 'Diet' },
   { path: '/progress', icon: TrendingUp, label: 'Progress' },
@@ -41,16 +40,18 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/workout" element={<Workout />} />
-          <Route path="/diet" element={<Diet />} />
-          <Route path="/progress" element={<Progress />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/sheets" element={<WorkoutSheets />} />
-        </Routes>
-      </Suspense>
+      <div key={location.pathname} className="route-transition-wrapper">
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes location={location}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/workout" element={<Workout />} />
+            <Route path="/diet" element={<Diet />} />
+            <Route path="/progress" element={<Progress />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/sheets" element={<WorkoutSheets />} />
+          </Routes>
+        </Suspense>
+      </div>
 
       <nav className="bottom-nav">
         {navItems.map(({ path, icon: Icon, label }) => (

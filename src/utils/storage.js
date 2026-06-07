@@ -199,8 +199,11 @@ export function getDeloadTracker() {
   };
 }
 
-export function updateDeloadTracker() {
+export function updateDeloadTracker(newStartDate) {
   const tracker = getDeloadTracker();
+  if (newStartDate) {
+    tracker.startDate = newStartDate;
+  }
   const start = parseLocalDate(tracker.startDate);
   start.setHours(0, 0, 0, 0);
   const now = new Date();

@@ -5,46 +5,49 @@
    ============================ */
 
 :root {
-  /* Colors — iOS-inspired clean palette */
+  /* Colors — 60/30/10 Division Scheme — Matte Colorful "Tia" Style */
   --bg-primary: #FFFFFF;
-  --bg-secondary: #F2F2F7; /* iOS system gray 6 */
-  --bg-tertiary: #E5E5EA;  /* iOS system gray 5 */
-  --bg-card: #FFFFFF;
+  --bg-secondary: #FAF6F0; /* Soft warm matte cream */
+  --bg-tertiary: #F2EBE1;  /* Slightly deeper warm cream for inputs/muted blocks */
+  --bg-card: #FFFFFF;      /* Pure white cards */
+  --bg-glass: rgba(255, 255, 255, 0.75);
   
-  --text-primary: #1C1C1E;   /* iOS label */
-  --text-secondary: #636366; /* iOS secondary label */
-  --text-tertiary: #AEAEB2;  /* iOS tertiary label */
+  --text-primary: #2C2621;   /* Organic deep matte charcoal/dark brown */
+  --text-secondary: #5C524A; /* Warm matte brown-gray */
+  --text-tertiary: #8C7E74;  /* Soft earthy clay-gray */
   --text-inverse: #FFFFFF;
   
-  --accent-blue: #007AFF;       /* iOS system blue */
-  --accent-blue-light: #E8F0FE;
-  --accent-purple: #5856D6;     /* iOS system indigo */
-  --accent-gradient: linear-gradient(135deg, #007AFF, #5856D6);
-  --accent-gradient-soft: linear-gradient(135deg, #E8F0FE, #EDE7F6);
+  --accent-blue: #E27D60;       /* Matte terracotta */
+  --accent-blue-light: #F9ECE8; /* Terracotta light tint */
+  --accent-purple: #85586F;     /* Rich matte raspberry/plum */
+  --accent-purple-light: #F3ECEF; /* Raspberry light tint */
+  --accent-gradient: linear-gradient(135deg, #E27D60, #85586F); /* Premium matte gradient */
+  --accent-gradient-soft: linear-gradient(135deg, #F9ECE8, #F3ECEF);
   
-  --success: #34C759;       /* iOS system green */
-  --success-light: #E8F5E9;
-  --warning: #FF9500;       /* iOS system orange */
-  --warning-light: #FFF3E0;
-  --danger: #FF3B30;        /* iOS system red */
-  --danger-light: #FFEBEE;
-  --info: #007AFF;
-  --info-light: #E8F0FE;
+  --success: #6E8E75;       /* Matte sage green */
+  --success-light: #EEF3EF;
+  --warning: #E8A87C;       /* Matte apricot gold */
+  --warning-light: #FAF2EB;
+  --danger: #C38D9E;        /* Matte dusty rose */
+  --danger-light: #FAF0F2;
+  --info: #5B8296;          /* Matte slate blue */
+  --info-light: #EEF3F5;
   
-  --protein-color: #007AFF;
-  --carbs-color: #FF9500;
-  --fat-color: #FF3B30;
+  --protein-color: #E27D60;
+  --carbs-color: #E8A87C;
+  --fat-color: #C38D9E;
   
-  --border: #D1D1D6;        /* iOS separator */
-  --border-light: #E5E5EA;
+  --border: #2C2621;        /* Distinctive warm dark charcoal border */
+  --border-light: #D9CFC4;  /* Softer earthy separator */
+  --glass-border: rgba(44, 38, 33, 0.15);
   
-  /* Shadows — soft and diffuse like iOS */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.08);
-  --shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.1);
+  /* Shadows — Matte Neo-Brutalist Solid Offset */
+  --shadow-sm: 2px 2px 0px #2C2621;
+  --shadow-md: 4px 4px 0px #2C2621;
+  --shadow-lg: 6px 6px 0px #2C2621;
+  --shadow-xl: 8px 8px 0px #2C2621;
   
-  /* Spacing — generous, airy like iOS */
+  /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -52,25 +55,36 @@
   --space-xl: 32px;
   --space-2xl: 48px;
   
-  /* Radius — rounder like iOS */
+  /* Radius — Playful but geometric */
   --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
-  --radius-xl: 22px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
   
-  /* Transition */
-  --transition-fast: 150ms ease;
-  --transition-base: 250ms cubic-bezier(0.25, 0.1, 0.25, 1);
-  --transition-slow: 350ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* Transition curves and timing */
+  --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in: cubic-bezier(0.32, 0, 0.67, 0);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   
-  /* Typography — Google Sans feel via Plus Jakarta Sans */
+  --duration-micro: 120ms;
+  --duration-short: 200ms;
+  --duration-base: 300ms;
+  
+  --transition-fast: var(--duration-micro) var(--ease-standard);
+  --transition-base: var(--duration-short) var(--ease-standard);
+  --transition-slow: var(--duration-base) var(--ease-standard);
+  
   --font-family: 'Google Sans', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   
   /* Layout */
   --nav-height: 64px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
+  
+  --nav-bg: #FAF6F0;
+  --nav-border: #2C2621;
 }
 
 /* ===== RESET ===== */
@@ -122,16 +136,52 @@ body {
   flex: 1;
   padding: 20px;
   padding-top: calc(20px + var(--safe-top));
-  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px);
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 32px);
   max-width: 480px;
   margin: 0 auto;
   width: 100%;
-  animation: fadeIn 0.25s ease;
+  animation: fadeIn var(--duration-short) var(--ease-out);
   overflow-x: hidden;
   scroll-behavior: smooth;
 }
 
+@media (min-width: 768px) {
+  .page-content {
+    max-width: 960px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    align-items: start;
+    gap: var(--space-lg);
+  }
+  
+  .full-width-section, 
+  .section-header, 
+  .hero-greeting-block,
+  header {
+    grid-column: span 2;
+  }
+}
+
 /* ===== ANIMATIONS ===== */
+.route-transition-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  animation: routeSlideIn var(--duration-base) var(--ease-out) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes routeSlideIn {
+  from {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -215,10 +265,10 @@ body {
   left: 0;
   right: 0;
   height: calc(var(--nav-height) + var(--safe-bottom));
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--nav-bg);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
-  border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+  border-top: 2px solid var(--border) !important;
   display: flex;
   align-items: flex-start;
   justify-content: space-around;
@@ -277,120 +327,137 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* ===== CARDS — iOS grouped style ===== */
+/* ===== CARDS — Matte Neo-Brutalist ===== */
 .card {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  border: none; /* iOS cards have no border */
-  box-shadow: var(--shadow-sm);
-  -webkit-tap-highlight-color: transparent;
-  overflow: hidden;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  background: var(--bg-card) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 20px !important;
+  border: 2px solid var(--border) !important; /* Distinctive border */
+  box-shadow: var(--shadow-md) !important; /* Solid matte shadow */
+  -webkit-tap-highlight-color: transparent !important;
+  overflow: hidden !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.glass-card {
+  background: var(--bg-card) !important;
+  border: 2px solid var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 20px !important;
+  overflow: hidden !important;
+  transition: all var(--transition-fast) !important;
 }
 
 @media (hover: hover) {
   .card:hover {
-    box-shadow: var(--shadow-md);
+    transform: translate(-1px, -1px) !important;
+    box-shadow: var(--shadow-lg) !important;
+  }
+  .glass-card:hover {
+    transform: translate(-1px, -1px) !important;
+    box-shadow: var(--shadow-lg) !important;
   }
 }
 
+.card:active {
+  transform: translate(1px, 1px) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
 .card-accent {
-  background: var(--accent-gradient-soft);
+  background: var(--accent-gradient-soft) !important;
 }
 
 .card-warning {
-  background: var(--warning-light);
+  background: var(--warning-light) !important;
 }
 
 .card-danger {
-  background: var(--danger-light);
+  background: var(--danger-light) !important;
 }
 
 .card-success {
-  background: var(--success-light);
+  background: var(--success-light) !important;
 }
 
-/* ===== BUTTONS — iOS-style ===== */
+/* ===== BUTTONS — Matte Neo-Brutalist ===== */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  padding: 14px 28px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-family);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  transition: all var(--transition-base);
-  border: none;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  min-height: 48px;
-  touch-action: manipulation;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--space-sm) !important;
+  padding: 14px 28px !important;
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-family) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  cursor: pointer !important;
+  transition: all var(--transition-fast) !important;
+  border: 2px solid var(--border) !important; /* Distinctive border */
+  box-shadow: var(--shadow-sm) !important; /* Matte solid shadow */
+  -webkit-tap-highlight-color: transparent !important;
+  user-select: none !important;
+  min-height: 48px !important;
+  touch-action: manipulation !important;
 }
 
-.btn:active {
-  transform: scale(0.97);
-  opacity: 0.85;
+.btn:active:not(:disabled) {
+  transform: translate(1px, 1px) !important;
+  box-shadow: 1px 1px 0px var(--border) !important;
 }
 
 .btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-  transform: none;
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 .btn-primary {
-  background: var(--accent-blue);
-  color: white;
-  box-shadow: none; /* iOS buttons don't have shadow */
+  background: var(--accent-blue) !important;
+  color: white !important;
 }
 
 @media (hover: hover) {
   .btn-primary:hover:not(:disabled) {
-    opacity: 0.88;
+    opacity: 0.95 !important;
   }
 }
 
-.btn-primary:active:not(:disabled) {
-  transform: scale(0.97);
-  opacity: 0.8;
-}
-
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
 }
 
 .btn-danger {
-  background: var(--danger);
-  color: white;
+  background: var(--danger) !important;
+  color: white !important;
 }
 
 .btn-outline {
-  background: transparent;
-  color: var(--accent-blue);
-  border: 1.5px solid var(--accent-blue);
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  border: 2px solid var(--border) !important;
 }
 
 .btn-sm {
-  padding: 10px 18px;
-  font-size: 13px;
-  border-radius: var(--radius-sm);
-  min-height: 38px;
+  padding: 10px 18px !important;
+  font-size: 13px !important;
+  border-radius: var(--radius-sm) !important;
+  min-height: 38px !important;
 }
 
 .btn-lg {
-  padding: 16px 32px;
-  font-size: 17px;
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  width: 100%;
-  min-height: 54px;
+  padding: 16px 32px !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  border-radius: var(--radius-md) !important;
+  width: 100% !important;
+  min-height: 54px !important;
 }
 
 .btn-icon {
@@ -401,16 +468,16 @@ body {
   min-height: 44px;
 }
 
-/* ===== INPUTS — iOS-style ===== */
+/* ===== INPUTS — Matte Neo-Brutalist ===== */
 .input {
   width: 100%;
   padding: 14px 16px;
-  border: none;
+  border: 2px solid var(--border) !important;
   border-radius: var(--radius-sm);
   font-family: var(--font-family);
   font-size: 16px;
   color: var(--text-primary);
-  background: var(--bg-secondary);
+  background: var(--bg-card);
   transition: all var(--transition-fast);
   outline: none;
   -webkit-appearance: none;
@@ -422,8 +489,8 @@ body {
 }
 
 .input:focus {
-  background: var(--bg-tertiary);
-  box-shadow: inset 0 0 0 2px var(--accent-blue);
+  border-color: var(--accent-purple) !important;
+  box-shadow: 2px 2px 0px var(--border) !important;
 }
 
 .input::placeholder {
@@ -567,13 +634,45 @@ input[type="number"]::-webkit-outer-spin-button {
 .modal-alert-content {
   background-color: var(--bg-card);
   border-radius: var(--radius-xl);
-  border: 1px solid var(--border-light);
+  border: 2px solid var(--border);
   padding: 24px;
   width: 100%;
   max-width: 320px;
   box-shadow: var(--shadow-xl);
   text-align: center;
   animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Modal and Alert Exit Animations & Classes */
+@keyframes modalFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes modalSlideDown {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+@keyframes alertPopOut {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.9) translateY(10px); opacity: 0; }
+}
+
+.modal-overlay-closing {
+  animation: modalFadeOut 0.25s var(--ease-in) forwards !important;
+}
+
+.modal-content-closing {
+  animation: modalSlideDown 0.25s cubic-bezier(0.32, 0, 0.67, 0) forwards !important;
+}
+
+.modal-alert-overlay-closing {
+  animation: modalFadeOut 0.2s var(--ease-in) forwards !important;
+}
+
+.modal-alert-content-closing {
+  animation: alertPopOut 0.2s var(--ease-in) forwards !important;
 }
 
 /* ===== UTILITY CLASSES ===== */
@@ -678,20 +777,21 @@ input[type="number"]::-webkit-outer-spin-button {
   display: flex;
   background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
-  padding: 3px;
-  gap: 2px;
+  padding: 4px;
+  gap: 4px;
+  border: 2px solid var(--border) !important;
 }
 
 .tab-item {
   flex: 1;
   padding: 10px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   text-align: center;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: all var(--transition-fast);
   background: transparent;
   border: none;
   font-family: var(--font-family);
@@ -707,7 +807,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .tab-item.active {
   background: var(--bg-primary);
   color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  border: 2px solid var(--border) !important;
+  box-shadow: 2px 2px 0px var(--border) !important;
 }
 
 /* ===== COLLAPSIBLE ===== */
@@ -792,3 +893,93 @@ input[type="number"]::-webkit-outer-spin-button {
   background: var(--accent-blue-light);
   color: var(--accent-blue);
 }
+
+/* ===== APP AUDIT UI refinement definitions ===== */
+.sheet-btn, .sheet-chip {
+  transition: all var(--transition-fast) cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.sheet-btn:active, .sheet-chip:active {
+  transform: scale(0.96) !important;
+  opacity: 0.8;
+}
+
+input, select, textarea {
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent-purple) !important;
+  box-shadow: 2px 2px 0px var(--border) !important;
+  background-color: #FFFFFF !important;
+}
+
+/* ===== DATE NAVIGATION SLIDING ANIMATIONS ===== */
+@keyframes slideInFromLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInFromRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.slide-in-from-left {
+  animation: slideInFromLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.slide-in-from-right {
+  animation: slideInFromRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ===== MILESTONE CELEBRATION KEYFRAMES ===== */
+@keyframes dashFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dashMilestonePop {
+  0% { transform: scale(0.9) translateY(20px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ===== DIET TRACKER KEYFRAMES ===== */
+@keyframes dietToastSlideUp {
+  from { transform: translateY(24px) scale(0.95); opacity: 0; }
+  to   { transform: translateY(0) scale(1);       opacity: 1; }
+}
+@keyframes dietPopIn {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+@keyframes dietRingDraw {
+  from { stroke-dasharray: 0 999; }
+}
+@keyframes dietRowFlash {
+  0%   { opacity: 1; transform: scale(1); max-height: 80px; padding-top: 8px; padding-bottom: 8px; border-bottom-width: 0.5px; overflow: hidden; }
+  100% { opacity: 0; transform: scale(0.95); max-height: 0; padding-top: 0; padding-bottom: 0; margin: 0; border: none; overflow: hidden; }
+}
+@keyframes dietDelBtnAnim {
+  0%   { transform: scale(1); color: #C7C7CC; }
+  50%  { transform: scale(1.4) rotate(-30deg); color: #FF3B30; }
+  100% { transform: scale(0); opacity: 0; }
+}
+@keyframes dietRowInsert {
+  0%   { opacity: 0; transform: translateY(-10px) scale(0.97); max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+  100% { opacity: 1; transform: translateY(0) scale(1); max-height: 100px; padding-top: 8px; padding-bottom: 8px; }
+}
+@keyframes dietMealExpand {
+  from { opacity: 0; max-height: 0; }
+  to   { opacity: 1; max-height: 1000px; }
+}
+@keyframes dietStarPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+

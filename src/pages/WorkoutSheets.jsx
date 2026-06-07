@@ -150,7 +150,7 @@ const defaultSheets = [
   }
 ];
 
-export default function WorkoutSheets() {
+export default function WorkoutSheets({ isEmbedded = false }) {
   const [sheets, setSheets] = useState([]);
   const [activeSheet, setActive] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
@@ -173,7 +173,7 @@ export default function WorkoutSheets() {
     loadData();
   }, []);
 
-  const loadData = () => {
+  function loadData() {
     let loaded = getWorkoutSheets();
     if (loaded.length === 0) {
       defaultSheets.forEach(s => saveWorkoutSheet({ ...s }));
@@ -181,7 +181,7 @@ export default function WorkoutSheets() {
     }
     setSheets(loaded);
     setActive(getActiveSheet());
-  };
+  }
 
   const canChangeActive = () => {
     const lastChange = localStorage.getItem('fitforge_last_sheet_change');
@@ -359,7 +359,7 @@ export default function WorkoutSheets() {
     return item ? item.type : 'accessory';
   };
 
-  const renderExerciseIcon = (type, size = 16, color = "#1C1C1E") => {
+  const renderExerciseIcon = (type, size = 16, color = "var(--text-primary)") => {
     if (type === 'compound') return <Dumbbell size={size} strokeWidth={2.4} color={color} />;
     if (type === 'conditioning') return <Zap size={size} strokeWidth={2.4} color={color} />;
     return <Sparkles size={size} strokeWidth={2.4} color={color} />;
@@ -408,46 +408,51 @@ export default function WorkoutSheets() {
 
   return (
     <div 
-      className="page-content" 
-      style={{ 
+      className={isEmbedded ? "" : "page-content"} 
+      style={isEmbedded ? { 
+        display: 'flex',
+        flexDirection: 'column',
+      } : { 
         paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)', 
         display: 'flex',
         flexDirection: 'column',
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#1C1C1E', margin: 0 }}>
-          Workout Sheets
-        </h1>
-        <p style={{ fontSize: 13, color: '#8E8E93', marginTop: 4, letterSpacing: '-0.01em', margin: '4px 0 0' }}>
-          Create, customize, and activate your weekly plans
-        </p>
-      </div>
+      {!isEmbedded && (
+        <div style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: 0 }}>
+            Workout Sheets
+          </h1>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, letterSpacing: '-0.01em', margin: '4px 0 0' }}>
+            Create, customize, and activate your weekly plans
+          </p>
+        </div>
+      )}
 
       {/* Active Sheet Banner */}
       {activeSheet && (
         <div 
-          className="sheet-btn"
           style={{
-            marginBottom: 20, 
-            padding: '16px 20px', 
-            borderRadius: '18px',
-            background: 'linear-gradient(135deg, #007AFF, #5856D6)', 
+            marginBottom: 24, 
+            padding: '20px', 
+            borderRadius: '20px',
+            background: 'var(--accent-purple-light)', 
             display: 'flex', 
             flexDirection: 'column',
-            boxShadow: '0 8px 24px rgba(88, 86, 214, 0.15)',
-            cursor: 'pointer',
+            border: '2px solid var(--border)',
+            boxShadow: 'var(--shadow-md)',
           }}
-          onClick={() => setExpandedSheet(expandedSheet === activeSheet.id ? null : activeSheet.id)}
         >
           {/* Banner Header Row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14 }}>
             <div style={{
               width: 38,
               height: 38,
               borderRadius: '12px',
-              background: 'rgba(255, 255, 255, 0.2)',
+              background: 'var(--accent-purple)',
+              border: '2px solid var(--border)',
+              boxShadow: 'var(--shadow-sm)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -455,141 +460,218 @@ export default function WorkoutSheets() {
               <Zap size={20} strokeWidth={2.4} color="#FFFFFF" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255, 255, 255, 0.8)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Currently Active Plan</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF', marginTop: 1, letterSpacing: '-0.01em' }}>{activeSheet.name}</div>
-            </div>
-            <div style={{
-              width: 24,
-              height: 24,
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              {expandedSheet === activeSheet.id ? (
-                <ChevronUp size={14} strokeWidth={2.4} color="#FFFFFF" />
-              ) : (
-                <ChevronDown size={14} strokeWidth={2.4} color="#FFFFFF" />
-              )}
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Currently Active Plan</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 1, letterSpacing: '-0.01em' }}>{activeSheet.name}</div>
             </div>
           </div>
 
-          {/* Expanded Banner Content */}
-          {expandedSheet === activeSheet.id && (
-            <div 
-              style={{
-                borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-                marginTop: 14,
-                paddingTop: 14,
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                animation: 'sheetsContentExpand 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-                overflow: 'hidden',
-              }}
-              onClick={e => e.stopPropagation()} // Prevent collapsing banner when clicking inside
-            >
-              {activeSheet.description && (
-                <div style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.9)', lineHeight: 1.45 }}>
-                  {activeSheet.description}
-                </div>
-              )}
-
-              {/* Exercise List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {activeSheet.exercises?.map((ex, i) => {
-                  const info = getExerciseInfo(ex.exerciseId);
-                  const type = getExerciseType(ex.exerciseId);
-                  return (
-                    <div key={i} style={{
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 12,
-                      padding: '10px 12px', 
-                      background: 'rgba(255, 255, 255, 0.12)', 
-                      borderRadius: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}>
-                      <div style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: '8px',
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}>
-                        {renderExerciseIcon(type, 14, "#FFFFFF")}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#FFFFFF' }}>{info.name}</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.7)', marginTop: 2 }}>
-                          {ex.minSets || ex.sets || 3}{ex.maxSets ? `-${ex.maxSets}` : ''} × {ex.reps}{ex.amrap ? '+' : ''} · {ex.weight > 0 ? `${ex.weight}kg` : 'No weight'} · Rest {ex.restMinutes}m
-                        </div>
-                      </div>
-                      {ex.amrap && (
-                        <span style={{ 
-                          fontSize: 8, 
-                          fontWeight: 700, 
-                          background: 'rgba(255, 255, 255, 0.2)', 
-                          color: '#FFFFFF', 
-                          padding: '2px 6px', 
-                          borderRadius: '100px', 
-                          letterSpacing: '0.03em' 
-                        }}>
-                          AMRAP
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+          {/* Statically Displayed Content */}
+          <div 
+            style={{
+              borderTop: '2px solid var(--border)',
+              paddingTop: 14,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            {activeSheet.description && (
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                {activeSheet.description}
               </div>
+            )}
 
-              {/* Deactivate Button inside banner */}
+            {/* Exercise List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {activeSheet.exercises?.map((ex, i) => {
+                const info = getExerciseInfo(ex.exerciseId);
+                const type = getExerciseType(ex.exerciseId);
+                return (
+                  <div key={i} style={{
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 12,
+                    padding: '10px 12px', 
+                    background: 'var(--bg-card)', 
+                    borderRadius: '12px',
+                    border: '2px solid var(--border)',
+                    boxShadow: 'var(--shadow-sm)',
+                  }}>
+                    <div style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '8px',
+                      background: 'var(--bg-secondary)',
+                      border: '1.5px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      {renderExerciseIcon(type, 14, "var(--text-primary)")}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{info.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                        {ex.minSets || ex.sets || 3}{ex.maxSets ? `-${ex.maxSets}` : ''} × {ex.reps}{ex.amrap ? '+' : ''} · {ex.weight > 0 ? `${ex.weight}kg` : 'No weight'} · Rest {ex.restMinutes}m
+                      </div>
+                    </div>
+                    {ex.amrap && (
+                      <span style={{ 
+                        fontSize: 8, 
+                        fontWeight: 700, 
+                        background: 'var(--warning-light)', 
+                        color: 'var(--text-primary)', 
+                        padding: '2px 6px', 
+                        borderRadius: '100px', 
+                        border: '1.5px solid var(--border)',
+                        letterSpacing: '0.03em' 
+                      }}>
+                        AMRAP
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons inside banner */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
               <button 
                 className="sheet-btn"
                 style={{ 
+                  flex: 1.5, 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   gap: 6,
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: '#FFFFFF',
-                  border: 'none',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  border: '2px solid var(--border)',
+                  boxShadow: 'var(--shadow-sm)',
                   borderRadius: '12px',
                   padding: '10px 16px',
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  width: '100%',
                 }} 
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDeactivate();
                 }}
               >
-                <RotateCcw size={14} strokeWidth={2.4} /> Deactivate Plan
+                <RotateCcw size={14} strokeWidth={2.4} color="var(--text-primary)" /> Deactivate
               </button>
+
+              {!activeSheet.isDefault && (
+                <button 
+                  className="sheet-btn"
+                  style={{
+                    width: 38,
+                    height: 38,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'var(--bg-card)',
+                    border: '2px solid var(--border)',
+                    boxShadow: 'var(--shadow-sm)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                  }} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSetDefault(activeSheet);
+                  }} 
+                  title="Set as default"
+                >
+                  <Star size={14} strokeWidth={2.4} color="var(--text-primary)" />
+                </button>
+              )}
+
+              <button 
+                className="sheet-btn"
+                style={{
+                  width: 38,
+                  height: 38,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--bg-card)',
+                  border: '2px solid var(--border)',
+                  boxShadow: 'var(--shadow-sm)',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                }} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEditSheet(activeSheet);
+                }}
+                title="Edit Plan"
+              >
+                <Edit3 size={14} strokeWidth={2.4} color="var(--text-primary)" />
+              </button>
+
+              {sheets.length > 1 && (
+                <button
+                  className="sheet-btn"
+                  style={{ 
+                    width: 38,
+                    height: 38,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'var(--bg-card)',
+                    border: '2px solid var(--border)',
+                    boxShadow: 'var(--shadow-sm)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                  }} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteConfirm(activeSheet.id);
+                  }}
+                  title="Delete Plan"
+                >
+                  <Trash2 size={14} strokeWidth={2.4} color="var(--text-primary)" />
+                </button>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
 
       {/* Sheets List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
-        {sheets.map(sheet => {
+        {sheets.filter(sheet => sheet.id !== activeSheet?.id).length === 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: '40px 20px',
+            background: 'var(--bg-card)',
+            border: '2px dashed var(--border)',
+            borderRadius: '20px',
+            color: '#8E8E93',
+            fontSize: 13,
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <Star size={24} strokeWidth={1.5} color="#C7C7CC" />
+            <span>No other plans. Create a new plan using the button below.</span>
+          </div>
+        )}
+        {sheets.filter(sheet => sheet.id !== activeSheet?.id).map(sheet => {
           const isActive = activeSheet?.id === sheet.id;
           const isExpanded = expandedSheet === sheet.id;
           return (
             <div 
               key={sheet.id} 
               style={{
-                background: isActive ? '#F6F9FF' : '#FFFFFF',
+                background: isActive ? 'var(--accent-blue-light)' : 'var(--bg-card)',
                 borderRadius: '20px',
-                border: isActive ? '1.5px solid #007AFF' : '1px solid #E5E5EA',
-                boxShadow: isActive ? '0 8px 24px rgba(0, 122, 255, 0.06)' : '0 4px 16px rgba(0, 0, 0, 0.02)',
+                border: '2px solid var(--border)',
+                boxShadow: isActive ? 'var(--shadow-md)' : 'var(--shadow-sm)',
                 padding: '16px',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 animation: deletingSheetId === sheet.id 
@@ -605,15 +687,16 @@ export default function WorkoutSheets() {
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, fontSize: 15, color: '#1C1C1E', letterSpacing: '-0.01em' }}>{sheet.name}</span>
+                      <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{sheet.name}</span>
                       {isActive && (
                         <span style={{ 
                           fontSize: 9, 
                           fontWeight: 700, 
-                          background: '#E5F6ED', 
-                          color: '#2E9E47', 
+                          background: 'var(--success-light)', 
+                          color: 'var(--success)', 
                           padding: '2px 6px', 
                           borderRadius: '100px', 
+                          border: '1.5px solid var(--border)',
                           letterSpacing: '0.03em' 
                         }}>
                           ACTIVE
@@ -631,24 +714,27 @@ export default function WorkoutSheets() {
                   width: 28,
                   height: 28,
                   borderRadius: '50%',
-                  background: '#F2F2F7',
+                  background: 'var(--bg-secondary)',
+                  border: '2.2px solid var(--border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                  {isExpanded ? <ChevronUp size={16} strokeWidth={2.4} color="#8E8E93" /> : <ChevronDown size={16} strokeWidth={2.4} color="#8E8E93" />}
+                  {isExpanded ? <ChevronUp size={16} strokeWidth={2.4} color="var(--text-primary)" /> : <ChevronDown size={16} strokeWidth={2.4} color="var(--text-primary)" />}
                 </div>
               </div>
 
               {/* Expanded Content */}
               {isExpanded && (
                 <div style={{
-                  borderTop: '1px solid #E5E5EA',
+                  borderTop: '2px solid var(--border)',
+                  marginTop: 12,
+                  paddingTop: 12,
                   animation: 'sheetsContentExpand 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                   overflow: 'hidden',
                 }}>
                   {sheet.description && (
-                    <div style={{ fontSize: 13, color: '#636366', marginBottom: 14, lineHeight: 1.45 }}>{sheet.description}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.45 }}>{sheet.description}</div>
                   )}
 
                   {/* Exercise List */}
@@ -662,25 +748,26 @@ export default function WorkoutSheets() {
                           alignItems: 'center', 
                           gap: 12,
                           padding: '12px 14px', 
-                          background: isActive ? '#FFFFFF' : '#F8F9FA', 
+                          background: isActive ? 'var(--bg-card)' : 'var(--bg-secondary)', 
                           borderRadius: '14px',
-                          border: isActive ? '1px solid #D0E5FF' : '1px solid #E5E5EA',
+                          border: '2px solid var(--border)',
+                          boxShadow: 'var(--shadow-sm)',
                         }}>
                           <div style={{
                             width: 32,
                             height: 32,
                             borderRadius: '8px',
-                            background: '#FFFFFF',
+                            background: 'var(--bg-card)',
+                            border: '1.5px solid var(--border)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
                           }}>
                             {renderExerciseIcon(type, 16)}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1C1C1E' }}>{info.name}</div>
-                            <div style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{info.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
                               {ex.minSets || ex.sets || 3}{ex.maxSets ? `-${ex.maxSets}` : ''} × {ex.reps}{ex.amrap ? '+' : ''} · {ex.weight > 0 ? `${ex.weight}kg` : 'No weight'} · Rest {ex.restMinutes}m
                             </div>
                           </div>
@@ -688,10 +775,11 @@ export default function WorkoutSheets() {
                             <span style={{ 
                               fontSize: 9, 
                               fontWeight: 700, 
-                              background: '#F3E8FF', 
-                              color: '#7B61FF', 
+                              background: 'var(--warning-light)', 
+                              color: 'var(--text-primary)', 
                               padding: '2px 6px', 
                               borderRadius: '100px', 
+                              border: '1.5px solid var(--border)',
                               letterSpacing: '0.03em' 
                             }}>
                               AMRAP
@@ -706,20 +794,21 @@ export default function WorkoutSheets() {
                   <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
                     {!isActive ? (
                       <button 
-                        className="sheet-btn"
+                        className="btn btn-primary"
                         style={{ 
                           flex: 1.5, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center', 
                           gap: 6,
-                          background: '#007AFF',
+                          background: 'var(--accent-blue)',
                           color: '#FFFFFF',
-                          border: 'none',
+                          border: '2px solid var(--border)',
                           borderRadius: '12px',
+                          boxShadow: 'var(--shadow-sm)',
                           padding: '10px 16px',
                           fontSize: 13,
-                          fontWeight: 600,
+                          fontWeight: 700,
                           cursor: 'pointer',
                         }} 
                         onClick={() => handleActivate(sheet)}
@@ -728,20 +817,21 @@ export default function WorkoutSheets() {
                       </button>
                     ) : (
                       <button 
-                        className="sheet-btn"
+                        className="btn btn-outline"
                         style={{ 
                           flex: 1.5, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center', 
                           gap: 6,
-                          background: '#FFF0F0',
-                          color: '#FF3B30',
-                          border: '1px solid #FFD1D1',
+                          background: 'var(--bg-card)',
+                          color: 'var(--danger)',
+                          border: '2px solid var(--border)',
                           borderRadius: '12px',
+                          boxShadow: 'var(--shadow-sm)',
                           padding: '10px 16px',
                           fontSize: 13,
-                          fontWeight: 600,
+                          fontWeight: 700,
                           cursor: 'pointer',
                         }} 
                         onClick={handleDeactivate}
@@ -759,15 +849,16 @@ export default function WorkoutSheets() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          background: '#FFFFFF',
-                          border: '1px solid #E5E5EA',
+                          background: 'var(--bg-card)',
+                          border: '2px solid var(--border)',
                           borderRadius: '12px',
+                          boxShadow: 'var(--shadow-sm)',
                           cursor: 'pointer',
                         }} 
                         onClick={() => handleSetDefault(sheet)} 
                         title="Set as default"
                       >
-                        <Star size={14} strokeWidth={2.4} color="#8E8E93" />
+                        <Star size={14} strokeWidth={2.4} color="var(--text-primary)" />
                       </button>
                     )}
 
@@ -779,14 +870,15 @@ export default function WorkoutSheets() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: '#FFFFFF',
-                        border: '1px solid #E5E5EA',
+                        background: 'var(--bg-card)',
+                        border: '2px solid var(--border)',
                         borderRadius: '12px',
+                        boxShadow: 'var(--shadow-sm)',
                         cursor: 'pointer',
                       }} 
                       onClick={() => openEditSheet(sheet)}
                     >
-                      <Edit3 size={14} strokeWidth={2.4} color="#8E8E93" />
+                      <Edit3 size={14} strokeWidth={2.4} color="var(--text-primary)" />
                     </button>
 
                     {sheets.length > 1 && (
@@ -798,10 +890,11 @@ export default function WorkoutSheets() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          background: '#FFF0F0', 
-                          color: '#FF3B30',
-                          border: '1px solid #FFD1D1',
+                          background: 'var(--bg-card)', 
+                          color: 'var(--danger)',
+                          border: '2px solid var(--border)',
                           borderRadius: '12px',
+                          boxShadow: 'var(--shadow-sm)',
                           cursor: 'pointer',
                         }}
                         onClick={() => setShowDeleteConfirm(sheet.id)}
@@ -819,22 +912,22 @@ export default function WorkoutSheets() {
 
       {/* Create New Sheet Button */}
       <button 
-        className="sheet-btn"
+        className="btn btn-primary"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
           width: '100%',
-          background: '#1C1C1E',
+          background: 'var(--accent-purple)',
           color: '#FFFFFF',
-          border: 'none',
+          border: '2px solid var(--border)',
           borderRadius: '14px',
           padding: '14px 20px',
           fontSize: 14,
-          fontWeight: 600,
+          fontWeight: 700,
           cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          boxShadow: 'var(--shadow-sm)',
         }} 
         onClick={openNewSheet}
       >
@@ -856,18 +949,18 @@ export default function WorkoutSheets() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 16 }}>
             {/* Sheet Info Card — iOS Settings Grouped Table Style */}
             <div style={{
-              background: '#FFFFFF',
+              background: 'var(--bg-card)',
               borderRadius: '14px',
-              border: '1px solid #E5E5EA',
+              border: '2px solid var(--border)',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              boxShadow: 'var(--shadow-sm)',
               overflow: 'hidden',
             }}>
               {/* Row 1: Name */}
               <div className="ios-form-row" style={{
                 padding: '12px 16px',
-                borderBottom: '1px solid #E5E5EA',
+                borderBottom: '2px solid var(--border)',
               }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Sheet Name *</label>
                 <input
@@ -877,7 +970,7 @@ export default function WorkoutSheets() {
                     border: 'none',
                     padding: '4px 0',
                     fontSize: 14,
-                    color: '#1C1C1E',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -891,7 +984,7 @@ export default function WorkoutSheets() {
               {/* Row 2: Description */}
               <div className="ios-form-row" style={{
                 padding: '12px 16px',
-                borderBottom: '1px solid #E5E5EA',
+                borderBottom: '1px solid var(--border-light)',
               }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Description</label>
                 <input
@@ -901,7 +994,7 @@ export default function WorkoutSheets() {
                     border: 'none',
                     padding: '4px 0',
                     fontSize: 14,
-                    color: '#1C1C1E',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -916,7 +1009,7 @@ export default function WorkoutSheets() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
                 <div className="ios-form-row" style={{
                   padding: '12px 16px',
-                  borderRight: '1px solid #E5E5EA',
+                  borderRight: '1px solid var(--border-light)',
                 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                     <Calendar size={11} strokeWidth={2.4} /> Start Date
@@ -928,7 +1021,7 @@ export default function WorkoutSheets() {
                       border: 'none',
                       padding: '4px 0',
                       fontSize: 13,
-                      color: '#1C1C1E',
+                      color: 'var(--text-primary)',
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
@@ -951,7 +1044,7 @@ export default function WorkoutSheets() {
                       border: 'none',
                       padding: '4px 0',
                       fontSize: 13,
-                      color: '#1C1C1E',
+                      color: 'var(--text-primary)',
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
@@ -967,23 +1060,24 @@ export default function WorkoutSheets() {
             {/* Exercises in Sheet */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContainer: 'space-between', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#1C1C1E' }}>Exercises ({editingSheet.exercises.length})</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Exercises ({editingSheet.exercises.length})</span>
                 {editingSheet.exercises.length >= 2 && (
                   <button
                     type="button"
                     className="sheet-btn"
                     style={{ 
-                      background: '#FFFFFF', 
+                      background: 'var(--bg-card)', 
                       color: '#007AFF', 
                       fontSize: 11, 
                       fontWeight: 600,
                       display: 'flex',
                       alignItems: 'center',
                       gap: 4,
-                      border: '1px solid #E5E5EA',
+                       border: '2px solid var(--border)',
                       borderRadius: '8px',
                       padding: '4px 10px',
                       cursor: 'pointer',
+                      boxShadow: 'var(--shadow-sm)',
                     }}
                     onClick={autoOrderExercises}
                   >
@@ -993,7 +1087,7 @@ export default function WorkoutSheets() {
               </div>
 
               {editingSheet.exercises.length === 0 && (
-                <div style={{ padding: '24px 16px', textAlign: 'center', background: '#FFFFFF', borderRadius: '16px', border: '1px dashed #E5E5EA' }}>
+                <div style={{ padding: '24px 16px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '16px', border: '2px dashed var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                   <Dumbbell size={28} strokeWidth={2.2} color="#8E8E93" style={{ marginBottom: 8 }} />
                   <div style={{ fontSize: 13, color: '#8E8E93', fontWeight: 500 }}>No exercises added yet</div>
                   <div style={{ fontSize: 11, color: '#AEAEB2', marginTop: 2 }}>Tap "Add Exercise" below</div>
@@ -1018,14 +1112,14 @@ export default function WorkoutSheets() {
                       onDragOver={(e) => handleDragOver(e, i)}
                       onDragEnd={handleDragEnd}
                       style={{
-                        background: '#FFFFFF',
+                        background: 'var(--bg-card)',
                         borderRadius: '14px',
-                        border: '1px solid #E5E5EA',
+                        border: '2px solid var(--border)',
                         overflow: 'hidden',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                         opacity: isDragging ? 0.4 : 1,
                         transform: isDragging ? 'scale(0.96)' : 'scale(1)',
-                        boxShadow: isDragging ? '0 12px 24px rgba(0,0,0,0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
+                        boxShadow: isDragging ? '0 12px 24px rgba(0,0,0,0.08)' : 'var(--shadow-sm)',
                         animation: 'sheetsExInsert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                       }}
                     >
@@ -1043,7 +1137,7 @@ export default function WorkoutSheets() {
                       >
                         <GripVertical size={16} color="#C7C7CC" style={{ cursor: 'grab', flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0, paddingLeft: 4 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1C1C1E', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                             {renderExerciseIcon(type, 13)}
                             <span>{info.name}</span>
                           </div>
@@ -1077,7 +1171,7 @@ export default function WorkoutSheets() {
 
                       {/* Expanded Config */}
                       {isOpen && (
-                        <div className="ex-config-container" style={{ padding: '0 14px 14px', borderTop: '1px solid #E5E5EA', background: '#F9F9FB' }}>
+                        <div className="ex-config-container" style={{ padding: '0 14px 14px', borderTop: '1px solid var(--border-light)', background: '#F9F9FB' }}>
                           <div style={{ display: 'flex', gap: 4, marginTop: 10, marginBottom: 10 }}>
                             <button 
                               type="button" 
@@ -1086,17 +1180,18 @@ export default function WorkoutSheets() {
                                 width: 28, 
                                 height: 28, 
                                 borderRadius: '8px',
-                                background: '#FFFFFF',
-                                border: '1px solid #E5E5EA',
+                                background: 'var(--bg-card)',
+                                border: '2px solid var(--border)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 cursor: 'pointer',
+                                boxShadow: 'var(--shadow-sm)',
                               }} 
                               onClick={() => moveExercise(i, -1)} 
                               disabled={i === 0}
                             >
-                              <ChevronUp size={14} strokeWidth={2.4} color={i === 0 ? '#C7C7CC' : '#1C1C1E'} />
+                              <ChevronUp size={14} strokeWidth={2.4} color={i === 0 ? '#C7C7CC' : 'var(--text-primary)'} />
                             </button>
                             <button 
                               type="button" 
@@ -1105,17 +1200,18 @@ export default function WorkoutSheets() {
                                 width: 28, 
                                 height: 28, 
                                 borderRadius: '8px',
-                                background: '#FFFFFF',
-                                border: '1px solid #E5E5EA',
+                                background: 'var(--bg-card)',
+                                border: '2px solid var(--border)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 cursor: 'pointer',
+                                boxShadow: 'var(--shadow-sm)',
                               }} 
                               onClick={() => moveExercise(i, 1)} 
                               disabled={i === editingSheet.exercises.length - 1}
                             >
-                              <ChevronDown size={14} strokeWidth={2.4} color={i === editingSheet.exercises.length - 1 ? '#C7C7CC' : '#1C1C1E'} />
+                              <ChevronDown size={14} strokeWidth={2.4} color={i === editingSheet.exercises.length - 1 ? '#C7C7CC' : 'var(--text-primary)'} />
                             </button>
                             <div style={{ flex: 1, fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontWeight: 500 }}>
                               Targeting: {info.muscle}
@@ -1132,25 +1228,26 @@ export default function WorkoutSheets() {
                                 max="10" 
                                 style={{ 
                                   width: '100%', 
-                                  background: '#FFFFFF', 
-                                  border: '1px solid #E5E5EA', 
+                                  background: 'var(--bg-card)', 
+                                  border: '2px solid var(--border)', 
                                   borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
-                                  color: '#1C1C1E',
+                                  color: 'var(--text-primary)',
                                   boxSizing: 'border-box',
                                   transition: 'border-color 0.2s',
+                                  boxShadow: 'var(--shadow-sm)',
                                 }}
                                 value={ex.minSets || ex.sets || 3} 
                                 onChange={e => updateExerciseInSheet(i, 'minSets', +e.target.value)} 
                                 onFocus={(e) => {
-                                  e.target.style.borderColor = '#007AFF';
+                                  e.target.style.borderColor = 'var(--accent-purple)';
                                   handleFocus(e);
                                 }}
                                 onBlur={(e) => {
-                                  e.target.style.borderColor = '#E5E5EA';
+                                  e.target.style.borderColor = 'var(--border)';
                                 }}
                               />
                             </div>
@@ -1163,25 +1260,26 @@ export default function WorkoutSheets() {
                                 max="10" 
                                 style={{ 
                                   width: '100%', 
-                                  background: '#FFFFFF', 
-                                  border: '1px solid #E5E5EA', 
+                                  background: 'var(--bg-card)', 
+                                  border: '2px solid var(--border)', 
                                   borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
-                                  color: '#1C1C1E',
+                                  color: 'var(--text-primary)',
                                   boxSizing: 'border-box',
                                   transition: 'border-color 0.2s',
+                                  boxShadow: 'var(--shadow-sm)',
                                 }}
                                 value={ex.maxSets || ex.minSets || ex.sets || 5} 
                                 onChange={e => updateExerciseInSheet(i, 'maxSets', +e.target.value)} 
                                 onFocus={(e) => {
-                                  e.target.style.borderColor = '#007AFF';
+                                  e.target.style.borderColor = 'var(--accent-purple)';
                                   handleFocus(e);
                                 }}
                                 onBlur={(e) => {
-                                  e.target.style.borderColor = '#E5E5EA';
+                                  e.target.style.borderColor = 'var(--border)';
                                 }}
                               />
                             </div>
@@ -1194,25 +1292,26 @@ export default function WorkoutSheets() {
                                 max="30" 
                                 style={{ 
                                   width: '100%', 
-                                  background: '#FFFFFF', 
-                                  border: '1px solid #E5E5EA', 
+                                  background: 'var(--bg-card)', 
+                                  border: '2px solid var(--border)', 
                                   borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
-                                  color: '#1C1C1E',
+                                  color: 'var(--text-primary)',
                                   boxSizing: 'border-box',
                                   transition: 'border-color 0.2s',
+                                  boxShadow: 'var(--shadow-sm)',
                                 }}
                                 value={ex.reps} 
                                 onChange={e => updateExerciseInSheet(i, 'reps', +e.target.value)} 
                                 onFocus={(e) => {
-                                  e.target.style.borderColor = '#007AFF';
+                                  e.target.style.borderColor = 'var(--accent-purple)';
                                   handleFocus(e);
                                 }}
                                 onBlur={(e) => {
-                                  e.target.style.borderColor = '#E5E5EA';
+                                  e.target.style.borderColor = 'var(--border)';
                                 }}
                               />
                             </div>
@@ -1225,26 +1324,27 @@ export default function WorkoutSheets() {
                                 step="0.5" 
                                 style={{ 
                                   width: '100%', 
-                                  background: '#FFFFFF', 
-                                  border: '1px solid #E5E5EA', 
+                                  background: 'var(--bg-card)', 
+                                  border: '2px solid var(--border)', 
                                   borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
-                                  color: '#1C1C1E',
+                                  color: 'var(--text-primary)',
                                   boxSizing: 'border-box',
                                   transition: 'border-color 0.2s',
+                                  boxShadow: 'var(--shadow-sm)',
                                 }}
                                 placeholder="0" 
                                 value={ex.weight || ''} 
                                 onChange={e => updateExerciseInSheet(i, 'weight', +e.target.value)} 
                                 onFocus={(e) => {
-                                  e.target.style.borderColor = '#007AFF';
+                                  e.target.style.borderColor = 'var(--accent-purple)';
                                   handleFocus(e);
                                 }}
                                 onBlur={(e) => {
-                                  e.target.style.borderColor = '#E5E5EA';
+                                  e.target.style.borderColor = 'var(--border)';
                                 }}
                               />
                             </div>
@@ -1261,25 +1361,26 @@ export default function WorkoutSheets() {
                                 step="0.5" 
                                 style={{ 
                                   width: '100%', 
-                                  background: '#FFFFFF', 
-                                  border: '1px solid #E5E5EA', 
+                                  background: 'var(--bg-card)', 
+                                  border: '2px solid var(--border)', 
                                   borderRadius: '10px', 
                                   padding: '8px', 
                                   fontSize: 13, 
                                   textAlign: 'center',
                                   outline: 'none',
-                                  color: '#1C1C1E',
+                                  color: 'var(--text-primary)',
                                   boxSizing: 'border-box',
                                   transition: 'border-color 0.2s',
+                                  boxShadow: 'var(--shadow-sm)',
                                 }}
                                 value={ex.restMinutes} 
                                 onChange={e => updateExerciseInSheet(i, 'restMinutes', +e.target.value)} 
                                 onFocus={(e) => {
-                                  e.target.style.borderColor = '#007AFF';
+                                  e.target.style.borderColor = 'var(--accent-purple)';
                                   handleFocus(e);
                                 }}
                                 onBlur={(e) => {
-                                  e.target.style.borderColor = '#E5E5EA';
+                                  e.target.style.borderColor = 'var(--border)';
                                 }}
                               />
                             </div>
@@ -1291,18 +1392,19 @@ export default function WorkoutSheets() {
                                 style={{
                                   width: '100%',
                                   height: '37px',
-                                  background: ex.amrap ? '#E5F1FF' : '#FFFFFF',
-                                  color: ex.amrap ? '#007AFF' : '#1C1C1E',
-                                  border: ex.amrap ? '1px solid #007AFF' : '1px solid #E5E5EA',
+                                  background: ex.amrap ? 'var(--accent-blue-light)' : 'var(--bg-card)',
+                                  color: ex.amrap ? 'var(--accent-blue)' : 'var(--text-primary)',
+                                  border: '2px solid var(--border)',
                                   borderRadius: '10px',
                                   fontSize: 12,
-                                  fontWeight: 600,
+                                  fontWeight: 700,
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   gap: 6,
                                   cursor: 'pointer',
                                   transition: 'all 0.2s',
+                                  boxShadow: 'var(--shadow-sm)'
                                 }}
                               >
                                 <Check size={12} strokeWidth={2.4} color={ex.amrap ? '#007AFF' : '#8E8E93'} />
@@ -1314,24 +1416,25 @@ export default function WorkoutSheets() {
                           <input
                             style={{
                               width: '100%',
-                              background: '#FFFFFF',
-                              border: '1px solid #E5E5EA',
+                              background: 'var(--bg-card)',
+                              border: '2px solid var(--border)',
                               borderRadius: '10px',
                               padding: '8px 10px',
                               fontSize: 12,
                               outline: 'none',
-                              color: '#1C1C1E',
+                              color: 'var(--text-primary)',
                               boxSizing: 'border-box',
                               transition: 'border-color 0.2s',
+                              boxShadow: 'var(--shadow-sm)'
                             }}
                             placeholder="Notes (optional)"
                             value={ex.notes || ''} 
                             onChange={e => updateExerciseInSheet(i, 'notes', e.target.value)}
                             onFocus={(e) => {
-                              e.target.style.borderColor = '#007AFF';
+                              e.target.style.borderColor = 'var(--accent-purple)';
                             }}
                             onBlur={(e) => {
-                              e.target.style.borderColor = '#E5E5EA';
+                              e.target.style.borderColor = 'var(--border)';
                             }}
                           />
                         </div>
@@ -1352,14 +1455,15 @@ export default function WorkoutSheets() {
                   justifyContent: 'center',
                   gap: 6,
                   width: '100%',
-                  background: '#FFFFFF',
-                  color: '#1C1C1E',
-                  border: '1.5px solid #E5E5EA',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  border: '2px solid var(--border)',
                   borderRadius: '12px',
                   padding: '12px 16px',
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
+                  boxShadow: 'var(--shadow-sm)',
                 }}
                 onClick={() => setShowCatalog(true)}
               >
@@ -1376,7 +1480,7 @@ export default function WorkoutSheets() {
                 justifyContent: 'center',
                 gap: 6,
                 width: '100%',
-                background: editingSheet.name.trim() ? '#1C1C1E' : '#AEAEB2',
+                background: editingSheet.name.trim() ? 'var(--text-primary)' : '#AEAEB2',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '14px',
@@ -1401,18 +1505,16 @@ export default function WorkoutSheets() {
         title="Add Exercise"
         type="bottom-sheet"
       >
-        {/* Sticky Search and filters container */}
+        {/* Search and filters container (scrolls out of view) */}
         <div style={{
-          position: 'sticky',
-          top: -24,
+          position: 'relative',
           background: 'var(--bg-secondary)',
-          zIndex: 10,
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
           paddingTop: 12,
           paddingBottom: 12,
-          borderBottom: '1px solid #E5E5EA',
+          borderBottom: '2px solid var(--border)',
           margin: '0 -20px 12px -20px',
           paddingLeft: 20,
           paddingRight: 20,
@@ -1429,19 +1531,20 @@ export default function WorkoutSheets() {
                 width: '100%',
                 padding: '10px 12px 10px 36px',
                 borderRadius: '10px',
-                border: '1px solid #E5E5EA',
-                background: '#FFFFFF',
+                border: '2px solid var(--border)',
+                background: 'var(--bg-card)',
                 fontSize: 14,
                 outline: 'none',
                 boxSizing: 'border-box',
                 fontFamily: 'inherit',
                 transition: 'all 0.2s',
+                boxShadow: 'var(--shadow-sm)',
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#007AFF';
+                e.target.style.borderColor = 'var(--accent-purple)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#E5E5EA';
+                e.target.style.borderColor = 'var(--border)';
               }}
             />
             {catalogSearch && (
@@ -1483,14 +1586,15 @@ export default function WorkoutSheets() {
                   className="sheet-chip"
                   style={{
                     flexShrink: 0,
-                    background: isAct ? '#007AFF' : '#FFFFFF',
-                    color: isAct ? '#FFFFFF' : '#1C1C1E',
-                    border: isAct ? 'none' : '1px solid #E5E5EA',
+                    background: isAct ? 'var(--accent-blue)' : 'var(--bg-card)',
+                    color: isAct ? 'var(--text-inverse)' : 'var(--text-primary)',
+                    border: isAct ? 'none' : '2px solid var(--border)',
                     borderRadius: '100px',
                     padding: '6px 14px',
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
+                    boxShadow: 'var(--shadow-sm)',
                   }}
                 >
                   {c.label}
@@ -1521,14 +1625,15 @@ export default function WorkoutSheets() {
                   className="sheet-chip"
                   style={{
                     flexShrink: 0,
-                    background: isAct ? '#E5F1FF' : '#FFFFFF',
-                    color: isAct ? '#007AFF' : '#8E8E93',
-                    border: isAct ? '1.5px solid #007AFF' : '1px solid #E5E5EA',
+                    background: isAct ? 'var(--accent-blue-light)' : 'var(--bg-card)',
+                    color: isAct ? 'var(--accent-blue)' : 'var(--text-tertiary)',
+                    border: isAct ? '2px solid var(--accent-blue)' : '2px solid var(--border)',
                     borderRadius: '100px',
                     padding: '5px 12px',
                     fontSize: 11,
                     fontWeight: 600,
                     cursor: 'pointer',
+                    boxShadow: 'var(--shadow-sm)',
                   }}
                 >
                   {m.label}
@@ -1566,7 +1671,7 @@ export default function WorkoutSheets() {
               return (
                 <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8E8E93' }}>
                   <AlertTriangle size={32} strokeWidth={2} style={{ marginBottom: 10, color: '#FF9500' }} />
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1C1C1E', marginBottom: 4 }}>No Exercises Found</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>No Exercises Found</div>
                   <div style={{ fontSize: 12, marginBottom: 14 }}>Try adjusting your search terms or filters.</div>
                   <button
                     className="sheet-btn"
@@ -1576,14 +1681,15 @@ export default function WorkoutSheets() {
                       setCatalogMuscle('all');
                     }}
                     style={{
-                      background: '#FFFFFF',
+                      background: 'var(--bg-card)',
                       color: '#007AFF',
-                      border: '1px solid #E5E5EA',
+                      border: '2px solid var(--border)',
                       borderRadius: '8px',
                       padding: '8px 16px',
                       fontSize: 13,
                       fontWeight: 600,
                       cursor: 'pointer',
+                      boxShadow: 'var(--shadow-sm)',
                     }}
                   >
                     Reset Filters
@@ -1596,18 +1702,21 @@ export default function WorkoutSheets() {
               <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {/* Category Header */}
                 <div style={{
+                  position: 'sticky',
+                  top: 40,
+                  background: 'var(--bg-secondary)',
+                  zIndex: 5,
                   fontSize: 11,
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   color: '#8E8E93',
-                  padding: '12px 0 6px',
-                  borderBottom: '1px solid #E5E5EA',
-                  marginBottom: 8,
+                  padding: '12px 20px 6px 20px',
+                  borderBottom: '2px solid var(--border)',
+                  margin: '0 -20px 8px -20px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
-                  marginTop: 8
                 }}>
                   <span>{group.icon}</span>
                   <span>{group.name}</span>
@@ -1630,20 +1739,21 @@ export default function WorkoutSheets() {
                           gap: 12,
                           width: '100%',
                           padding: '12px 14px',
-                          background: alreadyAdded ? '#F2F2F7' : '#FFFFFF',
+                          background: alreadyAdded ? 'var(--bg-tertiary)' : 'var(--bg-card)',
                           borderRadius: '14px',
-                          border: '1px solid #E5E5EA',
+                          border: '2px solid var(--border)',
                           cursor: alreadyAdded ? 'default' : 'pointer',
                           textAlign: 'left',
                           opacity: alreadyAdded ? 0.6 : 1,
                           boxSizing: 'border-box',
+                          boxShadow: 'var(--shadow-sm)',
                         }}
                       >
                         <div style={{
                           width: 32,
                           height: 32,
                           borderRadius: '8px',
-                          background: alreadyAdded ? '#E5E5EA' : '#F2F2F7',
+                          background: alreadyAdded ? 'var(--border)' : 'var(--bg-tertiary)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1652,7 +1762,7 @@ export default function WorkoutSheets() {
                           {ex.icon}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1C1C1E' }}>{ex.name}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{ex.name}</div>
                           <div style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>
                             {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
                           </div>
@@ -1671,7 +1781,7 @@ export default function WorkoutSheets() {
                             Added
                           </span>
                         ) : (
-                          <Plus size={16} strokeWidth={2.4} color="#1C1C1E" />
+                          <Plus size={16} strokeWidth={2.4} color="var(--text-primary)" />
                         )}
                       </button>
                     );
@@ -1702,7 +1812,7 @@ export default function WorkoutSheets() {
         }}>
           <Trash2 size={22} strokeWidth={2.2} color="#FF3B30" />
         </div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1C1C1E', marginBottom: 6, margin: 0 }}>Delete this sheet?</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, margin: 0 }}>Delete this sheet?</h2>
         <p style={{ fontSize: 12, color: '#8E8E93', marginBottom: 20, lineHeight: 1.5, margin: '6px 0 20px' }}>
           This action cannot be undone.
           {activeSheet?.id === showDeleteConfirm && ' The active sheet will switch to your default.'}
@@ -1712,14 +1822,15 @@ export default function WorkoutSheets() {
             className="sheet-btn"
             style={{ 
               flex: 1,
-              background: '#F2F2F7',
-              color: '#1C1C1E',
-              border: 'none',
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              border: '2px solid var(--border)',
               borderRadius: '12px',
               padding: '10px 16px',
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer',
+              boxShadow: 'var(--shadow-sm)',
             }} 
             onClick={() => setShowDeleteConfirm(null)}
           >
@@ -1731,16 +1842,17 @@ export default function WorkoutSheets() {
               flex: 1,
               background: '#FFF0F0',
               color: '#FF3B30',
-              border: '1px solid #FFD1D1',
+              border: '2px solid #FFD1D1',
               borderRadius: '12px',
               padding: '10px 16px',
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 4,
+              boxShadow: 'var(--shadow-sm)',
             }} 
             onClick={() => handleDelete(showDeleteConfirm)}
           >
@@ -1763,7 +1875,7 @@ export default function WorkoutSheets() {
           maxWidth: 400,
         }}>
           <div style={{
-            background: '#1C1C1E',
+            background: 'var(--text-primary)',
             color: '#FFFFFF', 
             padding: '12px 20px', 
             borderRadius: '20px', 

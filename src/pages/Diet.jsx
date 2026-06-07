@@ -1,58 +1,14 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import Modal from '../components/Modal';
 import {
   Plus, Search, X, Trash2, ChevronDown, ChevronUp, Droplets, AlertTriangle,
-  Sun, CloudSun, Moon, Cookie, Circle, Star, Check, ChevronLeft, ChevronRight
+  Sun, CloudSun, Moon, Cookie, Circle, Check, ChevronLeft, ChevronRight, CalendarCheck
 } from 'lucide-react';
 import foods, { foodCategories } from '../data/foods';
-import logo from '../assets/fitforge_logo.png';
-import { getDietByDate, saveDietLog, removeDietEntry, getToday, getSettings, getDietLogs } from '../utils/storage';
+import { getDietByDate, saveDietLog, removeDietEntry, getToday, getSettings, getWorkoutsByDate } from '../utils/storage';
 import { useModalLock, useInputFocus, useDebounce, useToast } from '../utils/ux';
 
-/* ──────────────────── inject keyframes (once) ──────────────────── */
-const KEYFRAMES_ID = 'diet-keyframes';
-if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
-  const sheet = document.createElement('style');
-  sheet.id = KEYFRAMES_ID;
-  sheet.textContent = `
 
-    @keyframes dietToastSlideUp {
-      from { transform: translateY(24px) scale(0.95); opacity: 0; }
-      to   { transform: translateY(0) scale(1);       opacity: 1; }
-    }
-    @keyframes dietPopIn {
-      0%   { transform: scale(0.6); opacity: 0; }
-      60%  { transform: scale(1.15); }
-      100% { transform: scale(1);   opacity: 1; }
-    }
-    @keyframes dietRingDraw {
-      from { stroke-dasharray: 0 999; }
-    }
-    @keyframes dietRowFlash {
-      0%   { opacity: 1; transform: scale(1); max-height: 80px; padding-top: 8px; padding-bottom: 8px; border-bottom-width: 0.5px; overflow: hidden; }
-      100% { opacity: 0; transform: scale(0.95); max-height: 0; padding-top: 0; padding-bottom: 0; margin: 0; border: none; overflow: hidden; }
-    }
-    @keyframes dietDelBtnAnim {
-      0%   { transform: scale(1); color: #C7C7CC; }
-      50%  { transform: scale(1.4) rotate(-30deg); color: #FF3B30; }
-      100% { transform: scale(0); opacity: 0; }
-    }
-    @keyframes dietRowInsert {
-      0%   { opacity: 0; transform: translateY(-10px) scale(0.97); max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
-      100% { opacity: 1; transform: translateY(0) scale(1); max-height: 100px; padding-top: 8px; padding-bottom: 8px; }
-    }
-    @keyframes dietMealExpand {
-      from { opacity: 0; max-height: 0; }
-      to   { opacity: 1; max-height: 1000px; }
-    }
-    @keyframes dietStarPop {
-      0%   { transform: scale(1); }
-      50%  { transform: scale(1.35); }
-      100% { transform: scale(1); }
-    }
-  `;
-  document.head.appendChild(sheet);
-}
 
 /* ──────────────────── helpers ──────────────────── */
 const fmtDate = (d) => {
@@ -71,16 +27,49 @@ const shiftDate = (d, n) => {
   return `${y}-${m}-${dd}`;
 };
 
-/** Auto-detect meal based on current time of day */
-const detectMeal = () => {
-  const h = new Date().getHours();
-  if (h < 11) return 'breakfast';
-  if (h < 16) return 'lunch';
-  if (h < 21) return 'dinner';
-  return 'snacks';
+
+/** Generate days grid for month calendar */
+const getDaysInMonth = (year, month) => {
+  const date = new Date(year, month, 1);
+  const days = [];
+  const firstDayIndex = date.getDay();
+  
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
+  for (let i = firstDayIndex - 1; i >= 0; i--) {
+    const d = new Date(year, month - 1, prevMonthLastDay - i);
+    days.push({ date: d, isCurrentMonth: false });
+  }
+  
+  const numDays = new Date(year, month + 1, 0).getDate();
+  for (let i = 1; i <= numDays; i++) {
+    const d = new Date(year, month, i);
+    days.push({ date: d, isCurrentMonth: true });
+  }
+  
+  const remaining = days.length % 7;
+  if (remaining > 0) {
+    for (let i = 1; i <= 7 - remaining; i++) {
+      const d = new Date(year, month + 1, i);
+      days.push({ date: d, isCurrentMonth: false });
+    }
+  }
+  return days;
 };
 
-// Favorites are now dynamically calculated from timeline history in getDietLogs()
+const formatDateString = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const r = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${r}`;
+};
+
+const formatCalVal = (val) => {
+  if (val >= 1000) {
+    return `${(val / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  return val;
+};
+
 
 const MEAL_ICONS = {
   breakfast: <Sun size={18} strokeWidth={2.2} />,
@@ -100,23 +89,141 @@ const MULTIPLIERS = [0.5, 1, 1.5, 2, 3];
 
 /** Category → color map for the small dot in the modal food list */
 const CAT_COLORS = {
-  rice_bread: '#FF9500',
-  fish: '#007AFF',
-  meat: '#FF3B30',
-  egg_dairy: '#FFCC00',
-  dal_legume: '#8E8E93',
-  vegetable: '#34C759',
-  fruit: '#AF52DE',
-  snack: '#FF6482',
-  drink: '#5AC8FA',
-  supplement: '#5856D6',
+  rice_bread: 'var(--carbs-color)',  // Amber / Warning
+  fish: 'var(--protein-color)',      // Indigo / Accent Blue
+  meat: 'var(--danger)',             // Rose / Danger
+  egg_dairy: 'var(--warning)',       // Amber / Warning
+  dal_legume: 'var(--text-tertiary)',// Muted gray
+  vegetable: 'var(--success)',       // Emerald
+  fruit: 'var(--accent-purple)',     // Violet
+  snack: 'var(--danger)',            // Rose
+  drink: 'var(--info)',              // Blue
+  supplement: 'var(--accent-purple)',// Violet
 };
 
 /* ──────────────────── component ──────────────────── */
 export default function Diet() {
   const settings = getSettings();
   const [date, setDate] = useState(getToday());
-  const [entries, setEntries] = useState([]);
+  const [slideDirection, setSlideDirection] = useState('right');
+  const [slideKey, setSlideKey] = useState(getToday());
+  const [entries, setEntries] = useState(() => getDietByDate(getToday()));
+
+  const handleDateShift = (direction) => {
+    const nextDate = shiftDate(date, direction);
+    if (nextDate === date) return;
+    if (direction < 0) {
+      setSlideDirection('right');
+    } else {
+      setSlideDirection('left');
+    }
+    setDate(nextDate);
+    setSlideKey(nextDate);
+  };
+  // Calendar History states
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(getToday());
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+
+  const handleDateChange = (newDate) => {
+    if (newDate === date) return;
+    if (newDate < date) {
+      setSlideDirection('right');
+    } else {
+      setSlideDirection('left');
+    }
+    setDate(newDate);
+    setSlideKey(newDate);
+  };
+
+  const getCaloriesOutForDate = useCallback((dateStr) => {
+    const workouts = getWorkoutsByDate(dateStr);
+    const userWeight = parseFloat(settings.weightKg) || 70;
+    return workouts.reduce((total, w) => {
+      if (w.caloriesBurnt) return total + w.caloriesBurnt;
+      const duration = w.duration || 45;
+      const burnt = Math.round(5.0 * 3.5 * userWeight / 200 * duration);
+      return total + burnt;
+    }, 0);
+  }, [settings.weightKg]);
+
+  const calendarDateMeals = useMemo(() => {
+    return getDietByDate(selectedCalendarDate);
+  }, [selectedCalendarDate]);
+
+  const calendarDays = useMemo(() => {
+    return getDaysInMonth(calendarYear, calendarMonth);
+  }, [calendarYear, calendarMonth]);
+
+  const touchStartRef = useRef(null);
+
+  const handleTouchStart = (e) => {
+    touchStartRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartRef.current === null) return;
+    const diffX = e.changedTouches[0].clientX - touchStartRef.current;
+    if (Math.abs(diffX) > 50) {
+      if (diffX > 0) {
+        handlePrevMonth();
+      } else {
+        handleNextMonth();
+      }
+    }
+    touchStartRef.current = null;
+  };
+
+  const handlePrevMonth = () => {
+    if (calendarMonth === 0) {
+      setCalendarMonth(11);
+      setCalendarYear(y => y - 1);
+    } else {
+      setCalendarMonth(m => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (calendarMonth === 11) {
+      setCalendarMonth(0);
+      setCalendarYear(y => y + 1);
+    } else {
+      setCalendarMonth(m => m + 1);
+    }
+  };
+
+  const calendarDaysData = useMemo(() => {
+    return calendarDays.map(day => {
+      const dateStr = formatDateString(day.date);
+      const caloriesIn = getDietByDate(dateStr).reduce((sum, e) => sum + (e.calories || 0), 0);
+      const caloriesOut = getCaloriesOutForDate(dateStr);
+      return {
+        ...day,
+        dateStr,
+        caloriesIn,
+        caloriesOut,
+      };
+    });
+  }, [calendarDays, getCaloriesOutForDate]);
+
+  const calendarTotals = useMemo(() => {
+    return calendarDateMeals.reduce((a, e) => ({
+      calories: a.calories + (e.calories || 0),
+      protein: a.protein + (e.protein || 0),
+      carbs: a.carbs + (e.carbs || 0),
+      fat: a.fat + (e.fat || 0),
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  }, [calendarDateMeals]);
+
+  const calendarMealEntries = useMemo(() => {
+    const grouped = { breakfast: [], lunch: [], dinner: [], snacks: [] };
+    calendarDateMeals.forEach(e => {
+      if (grouped[e.meal]) grouped[e.meal].push(e);
+    });
+    return grouped;
+  }, [calendarDateMeals]);
+
   const [expanded, setExpanded] = useState({ breakfast: true, lunch: true, dinner: true, snacks: true });
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMeal, setModalMeal] = useState('breakfast');
@@ -124,9 +231,21 @@ export default function Diet() {
   const [catFilter, setCatFilter] = useState('all');
   const [multipliers, setMultipliers] = useState({});
   const [expandedFoodId, setExpandedFoodId] = useState(null);
-  const [water, setWater] = useState(0);
+  const [water, setWater] = useState(() => {
+    const stored = localStorage.getItem('fitforge_water_' + getToday());
+    return stored ? Number(stored) : 0;
+  });
   const [flashId, setFlashId] = useState(null); // for delete flash
   const [lastWaterIdx, setLastWaterIdx] = useState(-1); // for water popIn
+  const [prevDate, setPrevDate] = useState(date);
+
+  if (date !== prevDate) {
+    setPrevDate(date);
+    setEntries(getDietByDate(date));
+    const storedWater = localStorage.getItem(`fitforge_water_${date}`);
+    setWater(storedWater ? Number(storedWater) : 0);
+    setLastWaterIdx(-1);
+  }
 
   const searchInputRef = useRef(null);
   const onFocusInput = useInputFocus();
@@ -134,7 +253,7 @@ export default function Diet() {
   const { toast, show: showToast } = useToast();
 
   /* lock background scroll when modal is open */
-  useModalLock(modalOpen);
+  useModalLock(modalOpen || calendarOpen);
 
   /* targets from settings */
   const targets = useMemo(() => ({
@@ -149,59 +268,9 @@ export default function Diet() {
   /* memoize today to prevent running layout helpers repeatedly */
   const today = useMemo(() => getToday(), []);
 
-  /* load entries for selected date */
-  useEffect(() => {
-    setEntries(getDietByDate(date));
-    const storedWater = localStorage.getItem(`fitforge_water_${date}`);
-    setWater(storedWater ? Number(storedWater) : 0);
-    setLastWaterIdx(-1);
-  }, [date]);
 
-  /* Quick Add Favorites: dynamically computed from log history */
-  const favorites = useMemo(() => {
-    const logs = getDietLogs();
-    const counts = {};
-    if (entries) {
-      logs.forEach(log => {
-        if (log.foodId) {
-          counts[log.foodId] = (counts[log.foodId] || 0) + 1;
-        }
-      });
-    }
-    const sortedIds = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    const topFoods = sortedIds
-      .slice(0, 5)
-      .map(id => foods.find(f => f.id === Number(id)))
-      .filter(Boolean);
 
-    // Seed default popular items if no entries are found
-    if (topFoods.length === 0) {
-      const seedIds = [31, 1, 23, 59]; // Boiled Egg, White Rice, Chicken Breast, Banana
-      return seedIds.map(id => foods.find(f => f.id === id)).filter(Boolean);
-    }
-    return topFoods;
-  }, [entries]);
 
-  const handleQuickAdd = useCallback((food) => {
-    if (!debounceAdd()) return;
-    const meal = detectMeal();
-    const entry = {
-      foodId: food.id,
-      name: food.name,
-      namebn: food.namebn,
-      meal,
-      serving: food.serving,
-      multiplier: 1,
-      calories: Math.round(food.calories),
-      protein: Math.round(food.protein * 10) / 10,
-      carbs: Math.round(food.carbs * 10) / 10,
-      fat: Math.round(food.fat * 10) / 10,
-      date,
-    };
-    saveDietLog(entry);
-    setEntries(getDietByDate(date));
-    showToast(`Added ${food.namebn || food.name} to ${meal.charAt(0).toUpperCase() + meal.slice(1)}`);
-  }, [date, debounceAdd, showToast]);
 
   /* computed totals */
   const totals = useMemo(() => entries.reduce((a, e) => ({
@@ -316,13 +385,17 @@ export default function Diet() {
       {/* ───── Header Top Bar ───── */}
       <div style={s.headerTopBar}>
         <h1 style={s.pageTitle}>Diet Tracker</h1>
-        <div style={s.logoContainer}>
-          <img
-            src={logo}
-            alt="FitForge"
-            style={s.logoImage}
-          />
-        </div>
+        <button
+          style={s.logoContainer}
+          onClick={() => {
+            setSelectedCalendarDate(date);
+            setCalendarOpen(true);
+          }}
+          className="sheet-btn"
+          aria-label="Open calendar history"
+        >
+          <CalendarCheck size={20} strokeWidth={2.2} color="#007AFF" />
+        </button>
       </div>
 
       {/* ── Toast Notification (positioned elegantly above bottom navigation) ── */}
@@ -330,7 +403,7 @@ export default function Diet() {
         <div key={toast.id} style={s.toast}>
           <div style={{
             ...s.toastInner,
-            background: toast.type === 'success' ? '#34C759' : '#FF3B30',
+            background: toast.type === 'success' ? 'var(--success)' : 'var(--danger)',
           }}>
             {toast.type === 'success' ? <Check size={14} strokeWidth={2.5} /> : <X size={14} strokeWidth={2.5} />}
             {toast.message}
@@ -348,7 +421,11 @@ export default function Diet() {
 
       {/* ── Header / Date Navigator ── */}
       <div style={s.dateNav}>
-        <button style={s.dateBtn} onClick={() => setDate(shiftDate(date, -1))}>
+        <button 
+          style={s.dateBtn} 
+          onClick={() => handleDateShift(-1)}
+          aria-label="Previous Day"
+        >
           <ChevronLeft size={20} strokeWidth={2.2} />
         </button>
         <div style={s.dateLabel}>
@@ -357,78 +434,74 @@ export default function Diet() {
         </div>
         <button
           style={{ ...s.dateBtn, ...(date >= today ? s.dateBtnDisabled : {}) }}
-          onClick={() => setDate(shiftDate(date, 1))}
+          onClick={() => handleDateShift(1)}
           disabled={date >= today}
+          aria-label="Next Day"
         >
           <ChevronRight size={20} strokeWidth={2.2} />
         </button>
       </div>
 
-      {/* ── Daily Summary Card ── */}
-      <div style={s.summaryCard}>
-        <div style={s.summaryTop}>
-          {/* Calorie Ring */}
-          <div style={s.ringWrap}>
-            <svg viewBox="0 0 120 120" style={s.ringSvg}>
-              <circle cx="60" cy="60" r={radius} fill="none" stroke="#F2F2F7" strokeWidth="9" />
-              <circle
-                cx="60" cy="60" r={radius}
-                fill="none"
-                stroke="#007AFF"
-                strokeWidth="9"
-                strokeLinecap="round"
-                strokeDasharray={`${dash} ${circ}`}
-                transform="rotate(-90 60 60)"
+      {/* Date-switching animated container wrapper */}
+      <div 
+        key={slideKey} 
+        className={slideDirection === 'left' ? 'slide-in-from-right' : 'slide-in-from-left'}
+        style={{ display: 'flex', flexDirection: 'column', flex: 1 }}
+      >
+        {/* ── Daily Summary Card ── */}
+        <div style={s.summaryCard}>
+          <div style={s.summaryTop}>
+            {/* Calorie Ring */}
+            <div style={s.ringWrap}>
+              <svg 
+                viewBox="0 0 120 120" 
                 style={{
-                  transition: 'stroke-dasharray 0.5s cubic-bezier(0.1, 0.76, 0.55, 0.94)',
-                  animation: 'dietRingDraw 0.8s ease-out',
+                  ...s.ringSvg,
+                  filter: totals.calories >= targets.calories 
+                    ? 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.45))' 
+                    : 'none',
+                  transition: 'filter 0.3s ease',
                 }}
-              />
-            </svg>
-            <div style={s.ringInner}>
-              <span style={s.ringVal}>{totals.calories}</span>
-              <span style={s.ringUnit}>/ {targets.calories}</span>
-              <span style={s.ringLabel}>kcal</span>
+              >
+                <circle cx="60" cy="60" r={radius} fill="none" stroke="var(--bg-tertiary)" strokeWidth="9" />
+                <circle
+                  cx="60" cy="60" r={radius}
+                  fill="none"
+                  stroke="var(--accent-blue)"
+                  strokeWidth="9"
+                  strokeLinecap="round"
+                  strokeDasharray={`${dash} ${circ}`}
+                  transform="rotate(-90 60 60)"
+                  style={{
+                    transition: 'stroke-dasharray 0.5s cubic-bezier(0.1, 0.76, 0.55, 0.94)',
+                    animation: 'dietRingDraw 0.8s ease-out',
+                  }}
+                />
+              </svg>
+              <div style={s.ringInner}>
+                <span style={s.ringVal}>{totals.calories}</span>
+                <span style={s.ringUnit}>/ {targets.calories}</span>
+                <span style={s.ringLabel}>kcal</span>
+              </div>
+            </div>
+
+            {/* Macro Progress Grid */}
+            <div style={s.macros}>
+              <MacroRow label="Protein" value={totals.protein} target={targets.protein} unit="g" color="var(--protein-color)" />
+              <MacroRow label="Carbs" value={totals.carbs} target={targets.carbs} unit="g" color="var(--carbs-color)" />
+              <MacroRow label="Fat" value={totals.fat} target={targets.fat} unit="g" color="var(--fat-color)" />
             </div>
           </div>
-
-          {/* Macro Progress Grid */}
-          <div style={s.macros}>
-            <MacroRow label="Protein" value={totals.protein} target={targets.protein} unit="g" color="#007AFF" />
-            <MacroRow label="Carbs" value={totals.carbs} target={targets.carbs} unit="g" color="#FF9500" />
-            <MacroRow label="Fat" value={totals.fat} target={targets.fat} unit="g" color="#FF3B30" />
+          
+          <div style={s.remaining}>
+            {totals.calories < targets.calories
+              ? <span>{targets.calories - totals.calories} kcal left to reach target</span>
+              : <span style={s.overText}>Exceeded target by {totals.calories - targets.calories} kcal</span>}
           </div>
         </div>
-        
-        <div style={s.remaining}>
-          {totals.calories < targets.calories
-            ? <span>{targets.calories - totals.calories} kcal left to reach target</span>
-            : <span style={s.overText}>Exceeded target by {totals.calories - targets.calories} kcal</span>}
-        </div>
-      </div>
 
-      {/* ── Quick Add Favorites ── */}
-      <div style={s.favSection}>
-        <div style={s.sectionTitle}>
-          <span style={s.sectionTitleIcon}><Star size={13} fill="#FF9500" color="#FF9500" /></span>
-          Frequently Logged (Quick Add)
-        </div>
-        <div style={s.favChips}>
-          {favorites.map(food => (
-            <button
-              key={food.id}
-              style={s.favChip}
-              onClick={() => handleQuickAdd(food)}
-            >
-              <span style={s.favName}>{food.namebn || food.name}</span>
-              <span style={s.favCal}>{food.calories} kcal</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Meal Cards ── */}
-      <div style={s.mealList}>
+        {/* ── Meal Cards ── */}
+        <div style={s.mealList}>
         {MEALS.map(meal => {
           const items = mealEntries[meal.key] || [];
           const mealCal = items.reduce((sum, e) => sum + e.calories, 0);
@@ -494,18 +567,38 @@ export default function Diet() {
       </div>
 
       {/* ── Hydration Card ── */}
-      <div style={s.hydrationCard}>
+      <div style={{
+        ...s.hydrationCard,
+        boxShadow: water >= waterTarget 
+          ? '0 0 12px rgba(16, 185, 129, 0.25), 0 1px 4px rgba(0,0,0,0.02)' 
+          : s.hydrationCard.boxShadow,
+        borderColor: water >= waterTarget ? 'var(--success)' : s.hydrationCard.borderColor,
+        transition: 'all 0.3s ease',
+      }}>
         <div style={s.hydrationHeader}>
           <div style={s.hydrationLeft}>
-            <div style={s.waterIconBox}><Droplets size={18} color="#007AFF" strokeWidth={2.2} /></div>
+            <div style={s.waterIconBox}><Droplets size={18} color="var(--info)" strokeWidth={2.2} /></div>
             <div>
               <span style={s.hydrationTitle}>Hydration Tracker</span>
               <span style={s.hydrationSub}>{water} / {waterTarget} glasses · {(water * 0.25).toFixed(2)}L</span>
             </div>
           </div>
           <div style={s.hydrationBtns}>
-            <button style={{ ...s.waterBtn, ...s.waterBtnMinus, ...(water <= 0 ? s.waterBtnDisabled : {}) }} onClick={removeWater} disabled={water <= 0}>−</button>
-            <button style={{ ...s.waterBtn, ...s.waterBtnPlus }} onClick={addWater}>+</button>
+            <button 
+              style={{ ...s.waterBtn, ...s.waterBtnMinus, ...(water <= 0 ? s.waterBtnDisabled : {}) }} 
+              onClick={removeWater} 
+              disabled={water <= 0}
+              aria-label="Remove Water Glass"
+            >
+              −
+            </button>
+            <button 
+              style={{ ...s.waterBtn, ...s.waterBtnPlus }} 
+              onClick={addWater}
+              aria-label="Add Water Glass"
+            >
+              +
+            </button>
           </div>
         </div>
 
@@ -521,8 +614,8 @@ export default function Diet() {
             >
               <Circle
                 size={8}
-                fill={i < water ? '#007AFF' : '#C7C7CC'}
-                color={i < water ? '#007AFF' : '#C7C7CC'}
+                fill={i < water ? 'var(--info)' : 'transparent'}
+                color={i < water ? 'var(--info)' : 'var(--text-tertiary)'}
               />
             </div>
           ))}
@@ -531,6 +624,7 @@ export default function Diet() {
         <div style={s.waterBarWrap}>
           <div style={{ ...s.waterBar, width: `${Math.min(water / waterTarget * 100, 100)}%` }} />
         </div>
+      </div>
       </div>
 
       {/* ── Floating Food Search Modal ── */}
@@ -541,49 +635,61 @@ export default function Diet() {
           title={
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <span style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-blue)' }}>{MEAL_ICONS[modalMeal]}</span>
-              <span>Add to ${MEALS.find(m => m.key === modalMeal)?.label}</span>
+              <span>Add to {MEALS.find(m => m.key === modalMeal)?.label}</span>
             </span>
           }
           type="bottom-sheet"
         >
 
-            {/* Search Box - no autofocus to prevent keyboard obstruction */}
-            <div style={s.modalSearchWrap}>
-              <Search size={16} strokeWidth={2.2} style={s.modalSearchIcon} />
-              <input
-                ref={searchInputRef}
-                style={s.modalSearchInput}
-                type="text"
-                placeholder="Search food... (e.g. ভাত, chicken)"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onFocus={onFocusInput}
-              />
-              {search && (
-                <button style={s.modalSearchClear} onClick={() => setSearch('')}>
-                  <X size={15} strokeWidth={2.2} />
-                </button>
-              )}
-            </div>
+            {/* Search and Category Filters Container (scrolls out of view) */}
+            <div style={{
+              position: 'relative',
+              background: 'var(--bg-secondary)',
+              display: 'flex',
+              flexDirection: 'column',
+              margin: '0 -20px 12px -20px',
+              borderBottom: '1px solid var(--border-light)',
+            }}>
+              {/* Search Box - no autofocus to prevent keyboard obstruction */}
+              <div style={{ ...s.modalSearchWrap, padding: '10px 20px' }}>
+                <Search size={16} strokeWidth={2.2} style={{ ...s.modalSearchIcon, left: 30 }} />
+                <input
+                  ref={searchInputRef}
+                  style={s.modalSearchInput}
+                  type="text"
+                  placeholder="Search food... (e.g. ভাত, chicken)"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  onFocus={onFocusInput}
+                />
+                {search && (
+                  <button style={{ ...s.modalSearchClear, right: 26 }} onClick={() => setSearch('')}>
+                    <X size={15} strokeWidth={2.2} />
+                  </button>
+                )}
+              </div>
 
-            {/* Category Filter Chips */}
-            <div style={s.catChips}>
-              <button
-                style={{ ...s.catChip, ...(catFilter === 'all' ? s.catChipActive : {}) }}
-                onClick={() => setCatFilter('all')}
-              >
-                All
-              </button>
-              {foodCategories.map(c => (
+              {/* Category Filter Chips */}
+              <div style={{ ...s.catChips, padding: '0 20px 12px 20px' }}>
                 <button
-                  key={c.id}
-                  style={{ ...s.catChip, ...(catFilter === c.id ? s.catChipActive : {}) }}
-                  onClick={() => setCatFilter(c.id)}
+                  className="sheet-chip"
+                  style={{ ...s.catChip, ...(catFilter === 'all' ? s.catChipActive : {}) }}
+                  onClick={() => setCatFilter('all')}
                 >
-                  <span style={{ ...s.catDot, background: CAT_COLORS[c.id] || '#8E8E93' }} />
-                  {c.name}
+                  All
                 </button>
-              ))}
+                {foodCategories.map(c => (
+                  <button
+                    key={c.id}
+                    className="sheet-chip"
+                    style={{ ...s.catChip, ...(catFilter === c.id ? s.catChipActive : {}) }}
+                    onClick={() => setCatFilter(c.id)}
+                  >
+                    <span style={{ ...s.catDot, background: CAT_COLORS[c.id] || '#8E8E93' }} />
+                    {c.name}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Scrollable Food List */}
@@ -632,7 +738,7 @@ export default function Diet() {
                             </div>
                             <div style={s.macroDetailCell}>
                               <span style={s.macroDetailLabel}>Calories</span>
-                              <span style={{ ...s.macroDetailVal, color: '#1C1C1E', fontWeight: 700 }}>
+                              <span style={{ ...s.macroDetailVal, color: 'var(--text-primary)', fontWeight: 700 }}>
                                 {Math.round(food.calories * mult)} kcal
                               </span>
                             </div>
@@ -687,17 +793,18 @@ export default function Diet() {
                               style={{
                                 width: 70,
                                 padding: '6px 10px',
-                                border: '1px solid #E5E5EA',
+                                border: '2px solid var(--border)',
                                 borderRadius: 8,
-                                background: '#FFFFFF',
+                                background: 'var(--bg-card)',
                                 fontSize: 13,
-                                color: '#1C1C1E',
-                                fontWeight: '600',
+                                color: 'var(--text-primary)',
+                                fontWeight: '650',
                                 textAlign: 'center',
-                                outline: 'none'
+                                outline: 'none',
+                                boxShadow: 'var(--shadow-sm)'
                               }}
                             />
-                            <span style={{ fontSize: 12, color: '#8E8E93', fontWeight: '500' }}>servings</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-tertiary)', fontWeight: '500' }}>servings</span>
                           </div>
                         </div>
                       )}
@@ -708,6 +815,165 @@ export default function Diet() {
             </div>
           </Modal>
         )}
+
+      {/* ── Calendar History Modal ── */}
+      {calendarOpen && (
+        <Modal
+          isOpen={calendarOpen}
+          onClose={() => setCalendarOpen(false)}
+          title="Diet History"
+          type="bottom-sheet"
+        >
+          {/* Month Selector */}
+          <div style={s.calendarMonthSelector}>
+            <button 
+              style={s.calendarMonthNavBtn} 
+              onClick={handlePrevMonth}
+              aria-label="Previous Month"
+            >
+              <ChevronLeft size={20} strokeWidth={2.2} />
+            </button>
+            <span style={s.calendarMonthName}>
+              {new Date(calendarYear, calendarMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </span>
+            <button 
+              style={s.calendarMonthNavBtn} 
+              onClick={handleNextMonth}
+              aria-label="Next Month"
+            >
+              <ChevronRight size={20} strokeWidth={2.2} />
+            </button>
+          </div>
+
+          {/* Swipeable Calendar Container */}
+          <div 
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            style={{ touchAction: 'pan-y' }}
+          >
+            {/* Weekday Row */}
+            <div style={s.calendarWeekdays}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                <span key={idx} style={s.calendarWeekdayLabel}>{day}</span>
+              ))}
+            </div>
+
+            {/* Days Grid */}
+            <div style={s.calendarGrid}>
+              {calendarDaysData.map((day) => {
+                const isSelected = day.dateStr === selectedCalendarDate;
+                const isTodayDate = day.dateStr === today;
+                return (
+                  <button
+                    key={day.dateStr}
+                    onClick={() => setSelectedCalendarDate(day.dateStr)}
+                    style={{
+                      ...s.calendarCell,
+                      backgroundColor: isSelected ? 'var(--accent-blue-light)' : 'transparent',
+                      borderColor: isSelected ? 'var(--accent-blue)' : (isTodayDate ? 'var(--border-light)' : 'transparent'),
+                      opacity: !day.isCurrentMonth ? 0.3 : 1
+                    }}
+                    className="sheet-btn"
+                  >
+                    <span style={{
+                      ...s.calendarCellDayNum,
+                      color: isSelected ? 'var(--accent-blue)' : 'var(--text-primary)'
+                    }}>
+                      {day.date.getDate()}
+                    </span>
+                    <div style={s.calendarCellCals}>
+                      {day.caloriesIn > 0 && (
+                        <span style={s.calendarCalIn}>+{formatCalVal(day.caloriesIn)}</span>
+                      )}
+                      {day.caloriesOut > 0 && (
+                        <span style={s.calendarCalOut}>-{formatCalVal(day.caloriesOut)}</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected Date Header and Active Shift Button */}
+          <div style={s.calendarSelectedHeader}>
+            <div style={s.calendarSelectedDateLabel}>
+              <span style={s.calendarSelectedDateText}>{fmtDate(selectedCalendarDate)}</span>
+              {selectedCalendarDate === today && <span style={s.dateBadge}>Today</span>}
+            </div>
+            {selectedCalendarDate !== date && (
+              <button
+                style={s.calendarSwitchBtn}
+                onClick={() => {
+                  handleDateChange(selectedCalendarDate);
+                  setCalendarOpen(false);
+                }}
+                className="sheet-btn"
+              >
+                Set Active Date
+              </button>
+            )}
+          </div>
+
+          {/* Macros summary for selected date */}
+          <div style={s.calendarMacrosBar}>
+            <div style={s.calendarMacroCard}>
+              <span style={s.calendarMacroVal}>{calendarTotals.calories} kcal</span>
+              <span style={s.calendarMacroLabel}>Calories</span>
+            </div>
+            <div style={s.calendarMacroCard}>
+              <span style={{ ...s.calendarMacroVal, color: 'var(--protein-color)' }}>{Math.round(calendarTotals.protein)}g</span>
+              <span style={s.calendarMacroLabel}>Protein</span>
+            </div>
+            <div style={s.calendarMacroCard}>
+              <span style={{ ...s.calendarMacroVal, color: 'var(--carbs-color)' }}>{Math.round(calendarTotals.carbs)}g</span>
+              <span style={s.calendarMacroLabel}>Carbs</span>
+            </div>
+            <div style={s.calendarMacroCard}>
+              <span style={{ ...s.calendarMacroVal, color: 'var(--fat-color)' }}>{Math.round(calendarTotals.fat)}g</span>
+              <span style={s.calendarMacroLabel}>Fat</span>
+            </div>
+          </div>
+
+          {/* Meals for selected date */}
+          <div style={s.calendarMealsTitle}>Logged Meals</div>
+          {calendarDateMeals.length === 0 ? (
+            <p style={s.calendarMealsEmpty}>No meals logged for this date.</p>
+          ) : (
+            <div style={s.calendarMealGroups}>
+              {MEALS.map(meal => {
+                const items = calendarMealEntries[meal.key] || [];
+                if (items.length === 0) return null;
+                const mealCal = items.reduce((sum, e) => sum + e.calories, 0);
+                return (
+                  <div key={meal.key} style={s.calendarMealGroup}>
+                    <div style={s.calendarMealGroupHeader}>
+                      <span style={s.calendarMealGroupTitle}>
+                        {meal.label} <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 'normal' }}>({meal.labelbn})</span>
+                      </span>
+                      <span style={s.calendarMealGroupCal}>{mealCal} kcal</span>
+                    </div>
+                    <div style={s.calendarMealItems}>
+                      {items.map(item => (
+                        <div key={item.id} style={s.calendarMealItemRow}>
+                          <div style={s.calendarMealItemLeft}>
+                            <span style={s.calendarMealItemName}>{item.namebn || item.name}</span>
+                            <span style={s.calendarMealItemMeta}>
+                              {item.multiplier !== 1 && `${item.multiplier}× · `}
+                              P {item.protein}g · C {item.carbs}g · F {item.fat}g
+                            </span>
+                          </div>
+                          <span style={s.calendarMealItemCal}>{item.calories} kcal</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
@@ -735,8 +1001,6 @@ const font = "'Google Sans', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemF
 
 const s = {
   page: {
-    maxWidth: 480,
-    margin: '0 auto',
     fontFamily: font,
     letterSpacing: '-0.01em',
     paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)', // prevent obstruction of last card
@@ -771,15 +1035,16 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    background: '#FFF9E6',
-    color: '#B7791F',
+    background: 'var(--warning-light)',
+    color: 'var(--warning)',
     padding: '12px 14px',
     borderRadius: 14,
     fontSize: 13,
     fontWeight: 500,
     marginBottom: 16,
     lineHeight: 1.45,
-    border: '1px solid rgba(255, 149, 0, 0.1)',
+    border: '2px solid var(--border)',
+    boxShadow: 'var(--shadow-sm)',
   },
   warningText: {
     flex: 1,
@@ -793,17 +1058,17 @@ const s = {
     marginBottom: 16,
   },
   dateBtn: {
-    width: 40,
-    height: 40,
-    background: '#FFFFFF',
-    border: '1px solid #E5E5EA',
+    width: 44,
+    height: 44,
+    background: 'var(--bg-card)',
+    border: '2px solid var(--border)',
     borderRadius: 12,
-    color: '#3A3A3C',
+    color: 'var(--text-primary)',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+    boxShadow: 'var(--shadow-sm)',
     transition: 'all 0.15s ease',
   },
   dateBtnDisabled: {
@@ -819,13 +1084,15 @@ const s = {
   dateText: {
     fontSize: 15,
     fontWeight: 600,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
   },
   dateBadge: {
     fontSize: 9,
     fontWeight: 700,
     color: '#FFFFFF',
-    background: '#007AFF',
+    background: 'var(--accent-blue)',
+    border: '1.5px solid var(--border)',
+    boxShadow: 'var(--shadow-sm)',
     padding: '1px 8px',
     borderRadius: 10,
     letterSpacing: '0.4px',
@@ -843,7 +1110,7 @@ const s = {
   pageTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
     margin: 0,
     letterSpacing: '-0.04em',
     lineHeight: 1.2,
@@ -853,12 +1120,12 @@ const s = {
     height: 40,
     borderRadius: 12,
     overflow: 'hidden',
-    border: '1.5px solid #E5E5EA',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+    border: '2px solid var(--border)',
+    boxShadow: 'var(--shadow-sm)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
   },
   logoImage: {
     width: '100%',
@@ -868,10 +1135,10 @@ const s = {
 
   /* ── Daily Summary Card ── */
   summaryCard: {
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
     borderRadius: 18,
-    border: '1px solid #E5E5EA',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+    border: '2px solid var(--border)',
+    boxShadow: 'var(--shadow-md)',
     padding: 16,
     marginBottom: 16,
   },
@@ -901,18 +1168,18 @@ const s = {
   ringVal: {
     fontSize: 22,
     fontWeight: 700,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
     lineHeight: 1,
   },
   ringUnit: {
     fontSize: 10,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     fontWeight: 500,
     marginTop: 1,
   },
   ringLabel: {
     fontSize: 9,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
@@ -934,20 +1201,20 @@ const s = {
   macroLabel: {
     fontSize: 11,
     fontWeight: 600,
-    color: '#3A3A3C',
+    color: 'var(--text-secondary)',
   },
   macroVal: {
     fontSize: 11,
     fontWeight: 600,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
   },
   macroTarget: {
     fontWeight: 400,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
   },
   macroTrack: {
     height: 5,
-    background: '#F2F2F7',
+    background: 'var(--bg-tertiary)',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -960,13 +1227,13 @@ const s = {
     textAlign: 'center',
     marginTop: 12,
     paddingTop: 12,
-    borderTop: '1px solid #F2F2F7',
+    borderTop: '1px solid var(--border-light)',
     fontSize: 12,
     fontWeight: 500,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
   },
   overText: {
-    color: '#FF3B30',
+    color: 'var(--danger)',
     fontWeight: 600,
   },
 
@@ -977,7 +1244,7 @@ const s = {
     gap: 5,
     fontSize: 13,
     fontWeight: 600,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     textTransform: 'uppercase',
     letterSpacing: '0.4px',
     margin: '0 0 8px 4px',
@@ -1005,19 +1272,19 @@ const s = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: 1,
-    background: '#FFFFFF',
-    border: '1px solid #E5E5EA',
+    background: 'var(--bg-card)',
+    border: '2px solid var(--border)',
     borderRadius: 12,
     padding: '8px 14px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     fontFamily: font,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+    boxShadow: 'var(--shadow-sm)',
   },
   favName: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
     whiteSpace: 'nowrap',
     maxWidth: 90,
     overflow: 'hidden',
@@ -1025,7 +1292,7 @@ const s = {
   },
   favCal: {
     fontSize: 9,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     fontWeight: 500,
   },
 
@@ -1037,10 +1304,10 @@ const s = {
     marginBottom: 16,
   },
   mealCard: {
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
     borderRadius: 16,
-    border: '1px solid #E5E5EA',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+    border: '2px solid var(--border)',
+    boxShadow: 'var(--shadow-md)',
     overflow: 'hidden',
   },
   mealHeader: {
@@ -1066,21 +1333,22 @@ const s = {
     width: 32,
     height: 32,
     borderRadius: 10,
-    background: '#F2F2F7',
-    color: '#3A3A3C',
+    background: 'var(--bg-tertiary)',
+    border: '2px solid var(--border)',
+    color: 'var(--text-secondary)',
     flexShrink: 0,
   },
   mealTitle: {
     display: 'block',
     fontSize: 14,
     fontWeight: 600,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
     textAlign: 'left',
   },
   mealTitleBn: {
     display: 'block',
     fontSize: 10,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     textAlign: 'left',
     marginTop: 1,
   },
@@ -1093,17 +1361,17 @@ const s = {
   mealCal: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#007AFF',
+    color: 'var(--accent-blue)',
   },
   mealBody: {
     padding: '0 14px 12px',
-    borderTop: '0.5px solid #F2F2F7',
+    borderTop: '2px solid var(--border)',
     animation: 'dietMealExpand 0.25s ease',
     overflow: 'hidden',
   },
   mealEmpty: {
     fontSize: 12,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     textAlign: 'center',
     padding: '8px 0',
     margin: 0,
@@ -1117,7 +1385,7 @@ const s = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '8px 0',
-    borderBottom: '0.5px solid #F2F2F7',
+    borderBottom: '1.5px solid var(--border-light)',
     animation: 'dietRowInsert 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
   },
   foodInfo: {
@@ -1129,14 +1397,14 @@ const s = {
   foodName: {
     fontSize: 13,
     fontWeight: 500,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
   foodMeta: {
     fontSize: 10.5,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     marginTop: 1.5,
   },
   foodDel: {
@@ -1159,23 +1427,24 @@ const s = {
     width: '100%',
     padding: '10px',
     marginTop: 8,
-    border: 'none',
+    border: '2px solid var(--border)',
     borderRadius: 10,
-    background: '#F2F2F7',
-    color: '#007AFF',
+    background: 'var(--bg-card)',
+    color: 'var(--text-primary)',
     fontSize: 12,
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer',
     fontFamily: font,
-    transition: 'background 0.15s ease',
+    boxShadow: 'var(--shadow-sm)',
+    transition: 'all 0.15s ease',
   },
 
   /* ── Hydration Card ── */
   hydrationCard: {
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
     borderRadius: 16,
-    border: '1px solid #E5E5EA',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+    border: '2px solid var(--border)',
+    boxShadow: 'var(--shadow-md)',
     padding: 14,
     marginBottom: 16,
   },
@@ -1197,19 +1466,20 @@ const s = {
     width: 32,
     height: 32,
     borderRadius: 10,
-    background: '#E5F1FF',
+    background: 'var(--info-light)',
+    border: '2px solid var(--border)',
     flexShrink: 0,
   },
   hydrationTitle: {
     display: 'block',
     fontSize: 14,
     fontWeight: 600,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
   },
   hydrationSub: {
     display: 'block',
     fontSize: 10.5,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     marginTop: 1,
   },
   hydrationBtns: {
@@ -1220,9 +1490,10 @@ const s = {
     width: 36,
     height: 36,
     borderRadius: 10,
-    border: 'none',
+    border: '2px solid var(--border)',
+    boxShadow: 'var(--shadow-sm)',
     fontSize: 18,
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -1230,16 +1501,17 @@ const s = {
     fontFamily: font,
   },
   waterBtnPlus: {
-    background: '#007AFF',
+    background: 'var(--info)',
     color: '#FFFFFF',
   },
   waterBtnMinus: {
-    background: '#F2F2F7',
-    color: '#8E8E93',
+    background: 'var(--bg-card)',
+    color: 'var(--text-primary)',
   },
   waterBtnDisabled: {
     opacity: 0.3,
     cursor: 'not-allowed',
+    boxShadow: 'none',
   },
   waterGlasses: {
     display: 'flex',
@@ -1254,21 +1526,24 @@ const s = {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '50%',
-    background: '#F2F2F7',
+    background: 'var(--bg-tertiary)',
+    border: '1.5px solid var(--border-light)',
     transition: 'all 0.2s ease',
   },
   glassFilled: {
-    background: '#E5F1FF',
+    background: 'var(--info-light)',
+    border: '2px solid var(--border)',
+    boxShadow: 'none',
   },
   waterBarWrap: {
     height: 4,
-    background: '#F2F2F7',
+    background: 'var(--bg-tertiary)',
     borderRadius: 4,
     overflow: 'hidden',
   },
   waterBar: {
     height: '100%',
-    background: '#007AFF',
+    background: 'var(--info)',
     borderRadius: 4,
     transition: 'width 0.4s cubic-bezier(0.1, 0.76, 0.55, 0.94)',
   },
@@ -1287,7 +1562,7 @@ const s = {
     animation: 'dietModalOverlayIn 0.22s ease-out',
   },
   modal: {
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
     width: '94%',
     maxWidth: 440,
     maxHeight: '75vh',
@@ -1296,8 +1571,8 @@ const s = {
     flexDirection: 'column',
     overflow: 'hidden',
     marginBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 12px)', // FLOATING ABOVE bottom tabs
-    boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
-    border: '1px solid rgba(0, 0, 0, 0.05)',
+    boxShadow: 'var(--shadow-xl)',
+    border: '2px solid var(--border)',
     animation: 'dietModalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
   },
   modalHead: {
@@ -1305,7 +1580,7 @@ const s = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '16px 18px 12px',
-    borderBottom: '1.5px solid #F2F2F7',
+    borderBottom: '2px solid var(--border)',
     flexShrink: 0, // prevent Android keyboard shrink
   },
   modalTitle: {
@@ -1314,19 +1589,19 @@ const s = {
     gap: 8,
     fontSize: 15,
     fontWeight: 700,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
     margin: 0,
     fontFamily: font,
   },
   modalTitleIcon: {
     display: 'flex',
     alignItems: 'center',
-    color: '#007AFF',
+    color: 'var(--accent-blue)',
   },
   modalClose: {
-    background: '#F2F2F7',
+    background: 'var(--bg-tertiary)',
     border: 'none',
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     cursor: 'pointer',
     borderRadius: '50%',
     width: 32,
@@ -1347,7 +1622,7 @@ const s = {
     left: 28,
     top: '50%',
     transform: 'translateY(-50%)',
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     pointerEvents: 'none',
   },
   modalSearchInput: {
@@ -1357,8 +1632,8 @@ const s = {
     borderRadius: 10,
     fontSize: 13.5,
     fontFamily: font,
-    color: '#1C1C1E',
-    background: '#F2F2F7',
+    color: 'var(--text-primary)',
+    background: 'var(--bg-tertiary)',
     outline: 'none',
     minHeight: 40,
   },
@@ -1369,7 +1644,7 @@ const s = {
     transform: 'translateY(-50%)',
     background: 'none',
     border: 'none',
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     cursor: 'pointer',
     padding: 6,
     display: 'flex',
@@ -1393,17 +1668,17 @@ const s = {
     padding: '6px 12px',
     borderRadius: 16,
     border: 'none',
-    background: '#F2F2F7',
+    background: 'var(--bg-tertiary)',
     fontSize: 11,
     fontWeight: 600,
-    color: '#3A3A3C',
+    color: 'var(--text-secondary)',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     fontFamily: font,
     transition: 'all 0.15s ease',
   },
   catChipActive: {
-    background: '#007AFF',
+    background: 'var(--accent-blue)',
     color: '#FFFFFF',
   },
   catDot: {
@@ -1415,20 +1690,17 @@ const s = {
   },
   modalList: {
     flex: 1,
-    overflowY: 'auto',
-    padding: '0 18px 16px',
-    scrollbarWidth: 'none',
-    WebkitOverflowScrolling: 'touch',
+    padding: '0 20px 16px 20px',
   },
   modalEmpty: {
     textAlign: 'center',
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     padding: '24px 0',
     fontSize: 13,
   },
   modalItem: {
     padding: '10px 0',
-    borderBottom: '0.5px solid #F2F2F7',
+    borderBottom: '0.5px solid var(--border-light)',
   },
   modalItemTop: {
     display: 'flex',
@@ -1458,7 +1730,7 @@ const s = {
   modalItemName: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -1466,14 +1738,14 @@ const s = {
   modalItemMultBadge: {
     fontSize: 9.5,
     fontWeight: 700,
-    color: '#007AFF',
-    background: '#E5F1FF',
+    color: 'var(--accent-blue)',
+    background: 'var(--accent-blue-light)',
     padding: '0.5px 5px',
     borderRadius: 6,
   },
   modalItemMeta: {
     fontSize: 10.5,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     marginTop: 1.5,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -1496,8 +1768,8 @@ const s = {
     justifyContent: 'center',
     width: 32,
     height: 32,
-    background: '#F2F2F7',
-    color: '#1C1C1E',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-primary)',
     border: 'none',
     borderRadius: '50%',
     cursor: 'pointer',
@@ -1515,10 +1787,10 @@ const s = {
     padding: '5px 10px',
     borderRadius: 8,
     border: 'none',
-    background: '#F2F2F7',
+    background: 'var(--bg-tertiary)',
     fontSize: 11,
     fontWeight: 600,
-    color: '#6B7280',
+    color: 'var(--text-secondary)',
     cursor: 'pointer',
     minHeight: 28,
     minWidth: 38,
@@ -1526,15 +1798,16 @@ const s = {
     fontFamily: font,
   },
   multBtnActive: {
-    background: '#E5F1FF',
-    color: '#007AFF',
+    background: 'var(--accent-blue-light)',
+    color: 'var(--accent-blue)',
   },
   expandedContent: {
     marginTop: 10,
     padding: '12px',
-    background: '#F8F9FA',
+    background: 'var(--bg-secondary)',
     borderRadius: 12,
-    border: '1px solid #E5E5EA',
+    border: '2px solid var(--border)',
+    boxShadow: 'var(--shadow-sm)',
     animation: 'dietMealExpand 0.22s cubic-bezier(0.1, 0.76, 0.55, 0.94)',
   },
   macroGrid: {
@@ -1549,35 +1822,275 @@ const s = {
     flexDirection: 'column',
     gap: 2,
     padding: '6px 8px',
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
     borderRadius: 8,
-    border: '1px solid #E5E5EA',
+    border: '2px solid var(--border)',
   },
   macroDetailCell: {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
     padding: '6px 8px',
-    background: '#FFFFFF',
+    background: 'var(--bg-card)',
     borderRadius: 8,
-    border: '1px solid #E5E5EA',
+    border: '2px solid var(--border)',
   },
   macroDetailLabel: {
     fontSize: 9,
     fontWeight: 600,
-    color: '#8E8E93',
+    color: 'var(--text-tertiary)',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
   macroDetailVal: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#1C1C1E',
+    color: 'var(--text-primary)',
   },
   multLabel: {
     fontSize: 11,
     fontWeight: 600,
-    color: '#3A3A3C',
+    color: 'var(--text-secondary)',
     margin: '8px 0 6px 2px',
+  },
+  calendarMonthSelector: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '4px 8px 12px',
+    borderBottom: '0.5px solid var(--border-light)',
+    marginBottom: 8,
+  },
+  calendarMonthNavBtn: {
+    width: 44,
+    height: 44,
+    background: 'none',
+    border: 'none',
+    color: 'var(--accent-blue)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '50%',
+    transition: 'background-color 0.2s',
+  },
+  calendarMonthName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'var(--text-primary)',
+    fontFamily: font,
+  },
+  calendarWeekdays: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  calendarWeekdayLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--text-tertiary)',
+    paddingBottom: 4,
+    fontFamily: font,
+  },
+  calendarGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: 4,
+    marginBottom: 16,
+  },
+  calendarCell: {
+    aspectRatio: '1',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    padding: '4px 2px 2px',
+    borderRadius: 8,
+    border: '2px solid transparent',
+    background: 'none',
+    cursor: 'pointer',
+    fontFamily: font,
+    outline: 'none',
+    transition: 'all 0.15s ease',
+  },
+  calendarCellDimmed: {
+    opacity: 0.3,
+  },
+  calendarCellSelected: {
+    background: 'var(--accent-blue-light)',
+    borderColor: 'var(--border)',
+    borderWidth: 2,
+    boxShadow: 'var(--shadow-sm)',
+  },
+  calendarCellToday: {
+    borderColor: 'var(--border-light)',
+  },
+  calendarCellDayNum: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+  },
+  calendarCellDayNumSelected: {
+    color: 'var(--accent-blue)',
+  },
+  calendarCellCals: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 0,
+    marginTop: 2,
+    width: '100%',
+  },
+  calendarCalIn: {
+    fontSize: 8.5,
+    fontWeight: 600,
+    color: 'var(--accent-blue)',
+    lineHeight: '9px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+  },
+  calendarCalOut: {
+    fontSize: 8.5,
+    fontWeight: 600,
+    color: 'var(--danger)',
+    lineHeight: '9px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+  },
+  calendarSelectedHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 0 8px',
+    borderTop: '0.5px solid var(--border-light)',
+    marginTop: 8,
+  },
+  calendarSelectedDateLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  calendarSelectedDateText: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+    fontFamily: font,
+  },
+  calendarSwitchBtn: {
+    background: 'var(--accent-blue)',
+    color: '#FFFFFF',
+    border: 'none',
+    borderRadius: 14,
+    padding: '5px 12px',
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    fontFamily: font,
+  },
+  calendarMacrosBar: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: 6,
+    margin: '8px 0 12px',
+  },
+  calendarMacroCard: {
+    background: 'var(--bg-tertiary)',
+    borderRadius: 8,
+    padding: '6px 4px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 1.5,
+  },
+  calendarMacroVal: {
+    fontSize: 11.5,
+    fontWeight: 700,
+    color: 'var(--text-primary)',
+  },
+  calendarMacroLabel: {
+    fontSize: 8.5,
+    color: 'var(--text-tertiary)',
+    fontWeight: 500,
+    textTransform: 'uppercase',
+  },
+  calendarMealsTitle: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--text-tertiary)',
+    marginBottom: 8,
+    fontFamily: font,
+  },
+  calendarMealsEmpty: {
+    fontSize: 12,
+    color: 'var(--text-tertiary)',
+    textAlign: 'center',
+    padding: '16px 0',
+    fontFamily: font,
+  },
+  calendarMealGroups: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    paddingBottom: 20,
+  },
+  calendarMealGroup: {
+    background: 'var(--bg-card)',
+    border: '2px solid var(--border)',
+    borderRadius: 12,
+    padding: 10,
+    boxShadow: 'var(--shadow-sm)',
+  },
+  calendarMealGroupHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    paddingBottom: 4,
+    borderBottom: '2px solid var(--border)',
+  },
+  calendarMealGroupTitle: {
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+  },
+  calendarMealGroupCal: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--text-tertiary)',
+  },
+  calendarMealItems: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 5,
+  },
+  calendarMealItemRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  calendarMealItemLeft: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+  },
+  calendarMealItemName: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: 'var(--text-primary)',
+  },
+  calendarMealItemMeta: {
+    fontSize: 10,
+    color: 'var(--text-tertiary)',
+  },
+  calendarMealItemCal: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: 'var(--text-primary)',
   },
 };
