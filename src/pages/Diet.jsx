@@ -70,6 +70,14 @@ const formatCalVal = (val) => {
   return val;
 };
 
+const detectMeal = () => {
+  const h = new Date().getHours();
+  if (h < 11) return 'breakfast';
+  if (h < 16) return 'lunch';
+  if (h < 21) return 'dinner';
+  return 'snacks';
+};
+
 
 const MEAL_ICONS = {
   breakfast: <Sun size={18} strokeWidth={2.2} />,
@@ -238,6 +246,52 @@ export default function Diet() {
   const [flashId, setFlashId] = useState(null); // for delete flash
   const [lastWaterIdx, setLastWaterIdx] = useState(-1); // for water popIn
   const [prevDate, setPrevDate] = useState(date);
+
+  /* Quick Add Favorites: dynamically computed from log history */
+  const favorites = useMemo(() => {
+    const logs = getDietLogs();
+    const counts = {};
+    if (entries) {
+      logs.forEach(log => {
+        if (log.foodId) {
+          counts[log.foodId] = (counts[log.foodId] || 0) + 1;
+        }
+      });
+    }
+    const sortedIds = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const topFoods = sortedIds
+      .slice(0, 5)
+      .map(id => foods.find(f => f.id === Number(id)))
+      .filter(Boolean);
+
+    // Seed default popular items if no entries are found
+    if (topFoods.length === 0) {
+      const seedIds = [31, 1, 23, 59]; // Boiled Egg, White Rice, Chicken Breast, Banana
+      return seedIds.map(id => foods.find(f => f.id === id)).filter(Boolean);
+    }
+    return topFoods;
+  }, [entries]);
+
+  const handleQuickAdd = useCallback((food) => {
+    if (!debounceAdd()) return;
+    const meal = detectMeal();
+    const entry = {
+      foodId: food.id,
+      name: food.name,
+      namebn: food.namebn,
+      meal,
+      serving: food.serving,
+      multiplier: 1,
+      calories: Math.round(food.calories),
+      protein: Math.round(food.protein * 10) / 10,
+      carbs: Math.round(food.carbs * 10) / 10,
+      fat: Math.round(food.fat * 10) / 10,
+      date,
+    };
+    saveDietLog(entry);
+    setEntries(getDietByDate(date));
+    showToast(`Added ${food.namebn || food.name} to ${meal.charAt(0).toUpperCase() + meal.slice(1)}`);
+  }, [date, debounceAdd, showToast]);
 
   if (date !== prevDate) {
     setPrevDate(date);
@@ -500,6 +554,52 @@ export default function Diet() {
           </div>
         </div>
 
+        {/* ── Quick Add Favorites ── */}
+        <div style={s.favSection}>
+          <div style={s.sectionTitle}>
+            <span style={s.sectionTitleIcon}><Star size={13} fill="#FF9500" color="#FF9500" /></span>
+            Frequently Logged (Quick Add)
+          </div>
+          <div style={s.favChips}>
+            {favorites.map(food => {
+              const loggedQuantity = entries
+                .filter(e => e.foodId === food.id)
+                .reduce((sum, e) => sum + (e.multiplier || 1), 0);
+              return (
+                <button
+                  key={food.id}
+                  className="sheet-btn"
+                  style={{
+                    ...s.favChip,
+                    background: loggedQuantity > 0 ? 'var(--success-light)' : 'var(--bg-card)'
+                  }}
+                  onClick={() => handleQuickAdd(food)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={s.favName}>{food.namebn || food.name}</span>
+                    {loggedQuantity > 0 && (
+                      <span style={{ 
+                        fontSize: 8.5, 
+                        fontWeight: 800, 
+                        background: 'var(--success)', 
+                        color: '#FFFFFF', 
+                        padding: '1px 4px', 
+                        borderRadius: '4px',
+                        marginLeft: 2,
+                        border: '1px solid var(--border)',
+                        animation: 'dietPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
+                      }}>
+                        {loggedQuantity}×
+                      </span>
+                    )}
+                  </div>
+                  <span style={s.favCal}>{food.calories} kcal</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* ── Meal Cards ── */}
         <div style={s.mealList}>
         {MEALS.map(meal => {
@@ -556,7 +656,7 @@ export default function Diet() {
                       ))}
                     </div>
                   )}
-                  <button style={s.addBtn} onClick={() => openModal(meal.key)}>
+                  <button className="sheet-btn" style={s.addBtn} onClick={() => openModal(meal.key)}>
                     <Plus size={15} strokeWidth={2.2} /> Add to {meal.label}
                   </button>
                 </div>
@@ -699,6 +799,9 @@ export default function Diet() {
               ) : (
                 filteredFoods.map(food => {
                   const mult = multipliers[food.id] || 1;
+                  const loggedQuantity = entries
+                    .filter(e => e.foodId === food.id)
+                    .reduce((sum, e) => sum + (e.multiplier || 1), 0);
                   return (
                     <div key={food.id} style={s.modalItem}>
                       <div style={s.modalItemTop}>
@@ -710,7 +813,12 @@ export default function Diet() {
                           <div style={s.modalItemNameRow}>
                             <span style={s.modalItemName}>{food.namebn}</span>
                             {mult !== 1 && (
-                              <span style={s.modalItemMultBadge}>{mult}×</span>
+                              <span style={{ ...s.modalItemMultBadge, animation: 'dietPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards' }}>{mult}×</span>
+                            )}
+                            {loggedQuantity > 0 && (
+                              <span style={{ ...s.modalItemMultBadge, backgroundColor: 'var(--success-light)', color: 'var(--success)', marginLeft: 6, animation: 'dietPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards' }}>
+                                {loggedQuantity}× logged
+                              </span>
                             )}
                           </div>
                           <span style={s.modalItemMeta}>
@@ -720,6 +828,7 @@ export default function Diet() {
                         
                         {/* Minimalist circular Gray Add button instead of unappealing blue button */}
                         <button
+                          className="sheet-btn"
                           style={s.modalAddBtn}
                           onClick={() => handleAdd(food, modalMeal)}
                         >
@@ -1770,11 +1879,11 @@ const s = {
     height: 32,
     background: 'var(--bg-tertiary)',
     color: 'var(--text-primary)',
-    border: 'none',
+    border: '2px solid var(--border)',
     borderRadius: '50%',
     cursor: 'pointer',
-    transition: 'all 0.12s ease',
     flexShrink: 0,
+    boxShadow: 'var(--shadow-sm)',
   },
   multRow: {
     display: 'flex',

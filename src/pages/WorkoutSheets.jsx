@@ -295,7 +295,8 @@ export default function WorkoutSheets({ isEmbedded = false }) {
         notes: '',
       }],
     }));
-    setShowCatalog(false);
+    // Keep catalog open so animations can run and users can perform multiple consecutive additions.
+    showToast(`Added ${catalogExercise.name}`);
   };
 
   const removeExerciseFromSheet = (index) => {
@@ -1726,11 +1727,11 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                 {/* Items */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {group.items.map(ex => {
-                    const alreadyAdded = editingSheet?.exercises.some(e => e.exerciseId === ex.id);
+                    const addedCount = editingSheet?.exercises.filter(e => e.exerciseId === ex.id).length || 0;
+                    const alreadyAdded = addedCount > 0;
                     return (
                       <button
                         key={ex.id}
-                        disabled={alreadyAdded}
                         onClick={() => addExerciseToSheet(ex)}
                         className="sheet-btn"
                         style={{
@@ -1739,12 +1740,11 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           gap: 12,
                           width: '100%',
                           padding: '12px 14px',
-                          background: alreadyAdded ? 'var(--bg-tertiary)' : 'var(--bg-card)',
+                          background: alreadyAdded ? 'var(--success-light)' : 'var(--bg-card)',
                           borderRadius: '14px',
                           border: '2px solid var(--border)',
-                          cursor: alreadyAdded ? 'default' : 'pointer',
+                          cursor: 'pointer',
                           textAlign: 'left',
-                          opacity: alreadyAdded ? 0.6 : 1,
                           boxSizing: 'border-box',
                           boxShadow: 'var(--shadow-sm)',
                         }}
@@ -1753,7 +1753,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           width: 32,
                           height: 32,
                           borderRadius: '8px',
-                          background: alreadyAdded ? 'var(--border)' : 'var(--bg-tertiary)',
+                          background: 'var(--bg-tertiary)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1768,18 +1768,21 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           </div>
                         </div>
                         {alreadyAdded ? (
-                          <span style={{ 
-                            fontSize: 9, 
-                            fontWeight: 700, 
-                            background: '#E5F6ED', 
-                            color: '#2E9E47', 
-                            padding: '2px 6px', 
-                            borderRadius: '100px', 
-                            letterSpacing: '0.03em',
-                            animation: 'sheetsAddPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
-                          }}>
-                            Added
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ 
+                              fontSize: 9, 
+                              fontWeight: 700, 
+                              background: '#E5F6ED', 
+                              color: '#2E9E47', 
+                              padding: '2px 6px', 
+                              borderRadius: '100px', 
+                              letterSpacing: '0.03em',
+                              animation: 'sheetsAddPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                            }}>
+                              {addedCount}× Added
+                            </span>
+                            <Plus size={16} strokeWidth={2.4} color="var(--text-primary)" />
+                          </div>
                         ) : (
                           <Plus size={16} strokeWidth={2.4} color="var(--text-primary)" />
                         )}
