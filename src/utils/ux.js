@@ -70,15 +70,20 @@ export function useDebounce(cooldownMs = 500) {
  * Returns { toast, show } where show(message, type) triggers a toast
  * and toast is the current toast state (or null).
  */
-export function useToast() {
+export function useToast(duration = 2400) {
   const [toast, setToast] = useState(null);
   const timerRef = useRef(null);
+  const exitRef = useRef(null);
 
   const show = useCallback((message, type = 'success') => {
     clearTimeout(timerRef.current);
-    setToast({ message, type, id: Date.now() });
-    timerRef.current = setTimeout(() => setToast(null), 2200);
-  }, []);
+    clearTimeout(exitRef.current);
+    setToast({ message, type, id: Date.now(), phase: 'enter' });
+    timerRef.current = setTimeout(() => {
+      setToast(prev => prev ? { ...prev, phase: 'exit' } : null);
+      exitRef.current = setTimeout(() => setToast(null), 350);
+    }, duration);
+  }, [duration]);
 
   return { toast, show };
 }

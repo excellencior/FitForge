@@ -70,7 +70,7 @@
   align-items: flex-start;
   gap: 10px;
   font-size: 13px;
-  color: #991B1B;
+  color: var(--text-secondary);
   line-height: 1.5;
   border-radius: var(--radius-md);
   margin-bottom: var(--space-md);
@@ -514,7 +514,7 @@
 
 .warning-item {
   font-size: 12px;
-  color: #991B1B;
+  color: var(--text-secondary);
   margin: 0;
   padding: 4px 0;
   line-height: 1.5;
@@ -1194,7 +1194,7 @@
 .pr-text {
   font-size: 14px;
   font-weight: 600;
-  color: #92400E;
+  color: var(--text-secondary);
   letter-spacing: -0.01em;
 }
 

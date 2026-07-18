@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   getWorkoutSheets, saveWorkoutSheet, deleteWorkoutSheet,
-  setActiveSheet, getActiveSheet, getToday
+  getRoutineSchedule, saveRoutineSchedule
 } from '../utils/storage';
 import { useModalLock, useInputFocus, useToast } from '../utils/ux';
 import { exercises as defaultExercises } from '../data/workouts';
@@ -9,7 +10,7 @@ import Modal from '../components/Modal';
 import {
   Plus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
   Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star, Calendar,
-  GripVertical, Sparkles, Search
+  GripVertical, Sparkles, Search, Moon
 } from 'lucide-react';
 
 const KEYFRAMES_ID = 'sheets-keyframes';
@@ -34,6 +35,10 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
       0%   { opacity: 0; transform: translateY(-8px) scale(0.98); }
       100% { opacity: 1; transform: translateY(0) scale(1); }
     }
+    @keyframes sheetsExRemove {
+      0%   { opacity: 1; transform: translateX(0); max-height: 120px; margin-bottom: 10px; }
+      100% { opacity: 0; transform: translateX(-100%); max-height: 0; margin-bottom: 0; padding: 0; border-width: 0; overflow: hidden; }
+    }
     @keyframes sheetsContentExpand {
       0%   { opacity: 0; transform: translateY(-10px); max-height: 0; margin-top: 0; padding-top: 0; overflow: hidden; }
       100% { opacity: 1; transform: translateY(0); max-height: 1500px; margin-top: 16px; padding-top: 16px; }
@@ -41,6 +46,14 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
     @keyframes sheetsExConfigExpand {
       0%   { opacity: 0; transform: translateY(-8px); max-height: 0; overflow: hidden; }
       100% { opacity: 1; transform: translateY(0); max-height: 500px; }
+    }
+    @keyframes toastSlideIn {
+      from { transform: translateX(-50%) translateY(24px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    @keyframes toastSlideOut {
+      from { transform: translateX(-50%) translateY(0); opacity: 1; }
+      to   { transform: translateX(-50%) translateY(24px); opacity: 0; }
     }
     .sheet-btn {
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -67,10 +80,10 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
       transition: background-color 0.2s ease;
     }
     .ios-form-row:focus-within {
-      background-color: #F9F9FC;
+      background-color: var(--bg-secondary);
     }
     .ios-form-row:focus-within label {
-      color: #007AFF !important;
+      color: var(--text-primary) !important;
     }
     .ex-config-container {
       animation: sheetsExConfigExpand 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -86,30 +99,17 @@ const exerciseCatalog = Object.values(defaultExercises).map(ex => ({
   muscle: ex.muscle,
   category: ex.category || 'strength',
   muscleGroup: ex.muscleGroup || 'legs',
-  type: ex.type,
-  icon: ex.icon || '💪'
+  type: ex.type
 }));
 
-/*
- * Optimal exercise ordering based on exercise science:
- * 1. Primary barbell compounds (highest neural demand, do fresh)
- * 2. Secondary compounds (heavy but less demanding)
- * 3. Accessory compounds (moderate load)
- * 4. Isolation exercises (least fatigue-sensitive)
- * 5. Core (stabilizers, don't fatigue before heavy lifts)
- * 6. Conditioning (finish with metabolic work)
- *
- * Within each tier, sort by muscle group size:
- * Legs > Back > Chest > Shoulders > Arms > Core > Cardio
- */
 const EXERCISE_PRIORITY = {
   squat: 10, deadlift: 11, bench: 12, ohp: 13,
   frontSquat: 14,
-  row: 20, pullup: 21, inclineBench: 22, romanianDL: 23,
-  legPress: 30, latPull: 31, tricepDip: 32,
-  legCurl: 40, shoulderRaise: 41, facePull: 42, curl: 43, calfRaise: 44,
+  row: 20, pullup: 21, inclineDbPress: 22, romanianDeadlift: 23,
+  legPress: 30, latPulldown: 31, dips: 32,
+  legCurl: 40, lateralRaise: 41, facePull: 42, curl: 43, calfRaise: 44,
   plank: 50,
-  kbSwing: 60, farmerWalk: 61, jumpRope: 62, bwCircuit: 63,
+  kbSwing: 60, farmerWalk: 61, jumpRope: 62, burpees: 63,
 };
 
 const TIER_LABELS = {
@@ -125,13 +125,7 @@ const getTier = (exId) => {
 
 const getTierLabel = (exId) => TIER_LABELS[getTier(exId)] || 'Exercise';
 const getTierColor = (exId) => {
-  const t = getTier(exId);
-  if (t === 1) return '#E04F4F';
-  if (t === 2) return '#E0851B';
-  if (t === 3) return '#3A86C8';
-  if (t === 4) return '#7B61FF';
-  if (t === 5) return '#2E9E47';
-  return '#7A7A7E';
+  return 'var(--text-secondary)';
 };
 
 const defaultSheets = [
@@ -150,9 +144,21 @@ const defaultSheets = [
   }
 ];
 
-export default function WorkoutSheets({ isEmbedded = false }) {
+const WEEKDAYS = [
+  { key: 'mon', label: 'Mon' },
+  { key: 'tue', label: 'Tue' },
+  { key: 'wed', label: 'Wed' },
+  { key: 'thu', label: 'Thu' },
+  { key: 'fri', label: 'Fri' },
+  { key: 'sat', label: 'Sat' },
+  { key: 'sun', label: 'Sun' },
+];
+
+export default function WorkoutSheets() {
   const [sheets, setSheets] = useState([]);
-  const [activeSheet, setActive] = useState(null);
+  const [schedule, setSchedule] = useState({ sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null });
+  const [dayPickerDay, setDayPickerDay] = useState(null);
+  
   const [showEditor, setShowEditor] = useState(false);
   const [editingSheet, setEditingSheet] = useState(null);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -164,10 +170,13 @@ export default function WorkoutSheets({ isEmbedded = false }) {
   const [expandedExIdx, setExpandedExIdx] = useState(null);
   const [dragIdx, setDragIdx] = useState(null);
   const [deletingSheetId, setDeletingSheetId] = useState(null);
+  const [removingExIdx, setRemovingExIdx] = useState(null);
+  const [undoExercise, setUndoExercise] = useState(null); // { exercise, index, timer }
+  
   const handleFocus = useInputFocus();
   const { toast, show: showToast } = useToast();
 
-  useModalLock(showEditor || showCatalog || !!showDeleteConfirm);
+  useModalLock(showEditor || showCatalog || !!showDeleteConfirm || !!dayPickerDay);
 
   useEffect(() => {
     loadData();
@@ -180,40 +189,8 @@ export default function WorkoutSheets({ isEmbedded = false }) {
       loaded = getWorkoutSheets();
     }
     setSheets(loaded);
-    setActive(getActiveSheet());
+    setSchedule(getRoutineSchedule());
   }
-
-  const canChangeActive = () => {
-    const lastChange = localStorage.getItem('fitforge_last_sheet_change');
-    if (!lastChange) return true;
-    return lastChange !== getToday();
-  };
-
-  const markActivationUsed = () => {
-    localStorage.setItem('fitforge_last_sheet_change', getToday());
-  };
-
-  const handleActivate = (sheet) => {
-    if (!canChangeActive()) {
-      showToast('You can only change your active sheet once per day', 'warning');
-      return;
-    }
-    setActiveSheet(sheet.id);
-    setActive(sheet);
-    markActivationUsed();
-    showToast(`Activated: ${sheet.name}`, 'success');
-  };
-
-  const handleDeactivate = () => {
-    if (!canChangeActive()) {
-      showToast('You can only change your active sheet once per day', 'warning');
-      return;
-    }
-    setActiveSheet(null);
-    setActive(null);
-    markActivationUsed();
-    showToast('Sheet deactivated', 'success');
-  };
 
   const handleDelete = (sheetId) => {
     const sheetName = sheets.find(s => s.id === sheetId)?.name || 'Sheet';
@@ -224,17 +201,21 @@ export default function WorkoutSheets({ isEmbedded = false }) {
     }
     setTimeout(() => {
       deleteWorkoutSheet(sheetId);
-      if (activeSheet?.id === sheetId) {
-        const remaining = getWorkoutSheets();
-        const defaultSheet = remaining.find(s => s.isDefault) || remaining[0];
-        if (defaultSheet) {
-          setActiveSheet(defaultSheet.id);
-          setActive(defaultSheet);
-        } else {
-          setActiveSheet(null);
-          setActive(null);
+      
+      // Update schedule if deleted sheet was assigned
+      const currentSchedule = getRoutineSchedule();
+      let scheduleChanged = false;
+      Object.keys(currentSchedule).forEach(day => {
+        if (currentSchedule[day] === sheetId) {
+          currentSchedule[day] = null;
+          scheduleChanged = true;
         }
+      });
+      if (scheduleChanged) {
+        saveRoutineSchedule(currentSchedule);
+        setSchedule(currentSchedule);
       }
+
       loadData();
       setDeletingSheetId(null);
       showToast(`Deleted: ${sheetName}`, 'success');
@@ -295,15 +276,43 @@ export default function WorkoutSheets({ isEmbedded = false }) {
         notes: '',
       }],
     }));
-    // Keep catalog open so animations can run and users can perform multiple consecutive additions.
     showToast(`Added ${catalogExercise.name}`);
   };
 
   const removeExerciseFromSheet = (index) => {
-    setEditingSheet(prev => ({
-      ...prev,
-      exercises: prev.exercises.filter((_, i) => i !== index),
-    }));
+    const removed = editingSheet.exercises[index];
+    const removedInfo = getExerciseInfo(removed.exerciseId);
+
+    // Clear any previous undo
+    if (undoExercise?.timer) clearTimeout(undoExercise.timer);
+
+    // Start slide-out animation
+    setRemovingExIdx(index);
+    setExpandedExIdx(null);
+
+    setTimeout(() => {
+      setEditingSheet(prev => ({
+        ...prev,
+        exercises: prev.exercises.filter((_, i) => i !== index),
+      }));
+      setRemovingExIdx(null);
+
+      // Set up undo toast
+      const timer = setTimeout(() => setUndoExercise(null), 5000);
+      setUndoExercise({ exercise: removed, index, name: removedInfo.name, timer });
+    }, 280);
+  };
+
+  const handleUndoRemove = () => {
+    if (!undoExercise) return;
+    clearTimeout(undoExercise.timer);
+    setEditingSheet(prev => {
+      const exercises = [...prev.exercises];
+      const insertAt = Math.min(undoExercise.index, exercises.length);
+      exercises.splice(insertAt, 0, undoExercise.exercise);
+      return { ...prev, exercises };
+    });
+    setUndoExercise(null);
   };
 
   const updateExerciseInSheet = (index, field, value) => {
@@ -407,250 +416,71 @@ export default function WorkoutSheets({ isEmbedded = false }) {
     return false;
   };
 
+  const handleAssignRoutine = (dayKey, sheetId) => {
+    const newSchedule = { ...schedule, [dayKey]: sheetId };
+    saveRoutineSchedule(newSchedule);
+    setSchedule(newSchedule);
+    setDayPickerDay(null);
+    showToast(`Schedule updated`, 'success');
+  };
+
+  const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
+
   return (
-    <div 
-      className={isEmbedded ? "" : "page-content"} 
-      style={isEmbedded ? { 
-        display: 'flex',
-        flexDirection: 'column',
-      } : { 
-        paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)', 
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)', display: 'flex', flexDirection: 'column' }}>
+      
       {/* Header */}
-      {!isEmbedded && (
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: 0 }}>
-            Workout Sheets
-          </h1>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, letterSpacing: '-0.01em', margin: '4px 0 0' }}>
-            Create, customize, and activate your weekly plans
-          </p>
-        </div>
-      )}
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: 0 }}>
+          Workout Sheets
+        </h1>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, letterSpacing: '-0.01em', margin: '4px 0 0' }}>
+          Create, customize, and schedule your weekly plans
+        </p>
+      </div>
 
-      {/* Active Sheet Banner */}
-      {activeSheet && (
-        <div 
-          style={{
-            marginBottom: 24, 
-            padding: '20px', 
-            borderRadius: '20px',
-            background: 'var(--accent-purple-light)', 
-            display: 'flex', 
-            flexDirection: 'column',
-            border: '2px solid var(--border)',
-            boxShadow: 'var(--shadow-md)',
-          }}
-        >
-          {/* Banner Header Row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14 }}>
-            <div style={{
-              width: 38,
-              height: 38,
-              borderRadius: '12px',
-              background: 'var(--accent-purple)',
-              border: '2px solid var(--border)',
-              boxShadow: 'var(--shadow-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Zap size={20} strokeWidth={2.4} color="#FFFFFF" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Currently Active Plan</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 1, letterSpacing: '-0.01em' }}>{activeSheet.name}</div>
-            </div>
-          </div>
-
-          {/* Statically Displayed Content */}
-          <div 
-            style={{
-              borderTop: '2px solid var(--border)',
-              paddingTop: 14,
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            {activeSheet.description && (
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                {activeSheet.description}
-              </div>
-            )}
-
-            {/* Exercise List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activeSheet.exercises?.map((ex, i) => {
-                const info = getExerciseInfo(ex.exerciseId);
-                const type = getExerciseType(ex.exerciseId);
-                return (
-                  <div key={i} style={{
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 12,
-                    padding: '10px 12px', 
-                    background: 'var(--bg-card)', 
-                    borderRadius: '12px',
-                    border: '2px solid var(--border)',
-                    boxShadow: 'var(--shadow-sm)',
-                  }}>
-                    <div style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '8px',
-                      background: 'var(--bg-secondary)',
-                      border: '1.5px solid var(--border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      {renderExerciseIcon(type, 14, "var(--text-primary)")}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{info.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-                        {ex.minSets || ex.sets || 3}{ex.maxSets ? `-${ex.maxSets}` : ''} × {ex.reps}{ex.amrap ? '+' : ''} · {ex.weight > 0 ? `${ex.weight}kg` : 'No weight'} · Rest {ex.restMinutes}m
-                      </div>
-                    </div>
-                    {ex.amrap && (
-                      <span style={{ 
-                        fontSize: 8, 
-                        fontWeight: 700, 
-                        background: 'var(--warning-light)', 
-                        color: 'var(--text-primary)', 
-                        padding: '2px 6px', 
-                        borderRadius: '100px', 
-                        border: '1.5px solid var(--border)',
-                        letterSpacing: '0.03em' 
-                      }}>
-                        AMRAP
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Action Buttons inside banner */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-              <button 
+      {/* Weekly Schedule */}
+      <div style={{ marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Weekly Schedule</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+          {WEEKDAYS.map(day => {
+            const assignedSheetId = schedule[day.key];
+            const isToday = day.key === todayKey;
+            
+            return (
+              <div key={day.key} 
+                onClick={() => setDayPickerDay(day.key)}
                 className="sheet-btn"
                 style={{ 
-                  flex: 1.5, 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: 6,
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-primary)',
-                  border: '2px solid var(--border)',
-                  boxShadow: 'var(--shadow-sm)',
-                  borderRadius: '12px',
-                  padding: '10px 16px',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }} 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeactivate();
-                }}
-              >
-                <RotateCcw size={14} strokeWidth={2.4} color="var(--text-primary)" /> Deactivate
-              </button>
-
-              {!activeSheet.isDefault && (
-                <button 
-                  className="sheet-btn"
-                  style={{
-                    width: 38,
-                    height: 38,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'var(--bg-card)',
-                    border: '2px solid var(--border)',
-                    boxShadow: 'var(--shadow-sm)',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                  }} 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSetDefault(activeSheet);
-                  }} 
-                  title="Set as default"
-                >
-                  <Star size={14} strokeWidth={2.4} color="var(--text-primary)" />
-                </button>
-              )}
-
-              <button 
-                className="sheet-btn"
-                style={{
-                  width: 38,
-                  height: 38,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'var(--bg-card)',
-                  border: '2px solid var(--border)',
-                  boxShadow: 'var(--shadow-sm)',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                }} 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openEditSheet(activeSheet);
-                }}
-                title="Edit Plan"
-              >
-                <Edit3 size={14} strokeWidth={2.4} color="var(--text-primary)" />
-              </button>
-
-              {sheets.length > 1 && (
-                <button
-                  className="sheet-btn"
-                  style={{ 
-                    width: 38,
-                    height: 38,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'var(--bg-card)',
-                    border: '2px solid var(--border)',
-                    boxShadow: 'var(--shadow-sm)',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                  }} 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(activeSheet.id);
-                  }}
-                  title="Delete Plan"
-                >
-                  <Trash2 size={14} strokeWidth={2.4} color="var(--text-primary)" />
-                </button>
-              )}
-            </div>
-          </div>
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                  cursor: 'pointer'
+                }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: isToday ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{day.label}</div>
+                <div style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: assignedSheetId ? 'var(--text-primary)' : 'var(--bg-card)',
+                  border: assignedSheetId ? '2px solid var(--text-primary)' : '2px dashed var(--border-light)',
+                  boxShadow: assignedSheetId ? 'var(--shadow-sm)' : 'none',
+                }}>
+                   {assignedSheetId ? <Dumbbell size={18} color="var(--bg-primary)" strokeWidth={2.4} /> : <Moon size={16} color="var(--border-light)" strokeWidth={2} />}
+                </div>
+              </div>
+            )
+          })}
         </div>
-      )}
+      </div>
 
       {/* Sheets List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
-        {sheets.filter(sheet => sheet.id !== activeSheet?.id).length === 0 && (
+        {sheets.length === 0 && (
           <div style={{
             textAlign: 'center',
             padding: '40px 20px',
             background: 'var(--bg-card)',
             border: '2px dashed var(--border)',
             borderRadius: '20px',
-            color: '#8E8E93',
+            color: 'var(--text-tertiary)',
             fontSize: 13,
             boxShadow: 'var(--shadow-sm)',
             display: 'flex',
@@ -658,21 +488,20 @@ export default function WorkoutSheets({ isEmbedded = false }) {
             alignItems: 'center',
             gap: 8,
           }}>
-            <Star size={24} strokeWidth={1.5} color="#C7C7CC" />
-            <span>No other plans. Create a new plan using the button below.</span>
+            <Star size={24} strokeWidth={1.5} color="var(--border-light)" />
+            <span>No plans created. Create a new plan using the button below.</span>
           </div>
         )}
-        {sheets.filter(sheet => sheet.id !== activeSheet?.id).map(sheet => {
-          const isActive = activeSheet?.id === sheet.id;
+        {sheets.map(sheet => {
           const isExpanded = expandedSheet === sheet.id;
           return (
             <div 
               key={sheet.id} 
               style={{
-                background: isActive ? 'var(--accent-blue-light)' : 'var(--bg-card)',
+                background: 'var(--bg-card)',
                 borderRadius: '20px',
                 border: '2px solid var(--border)',
-                boxShadow: isActive ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+                boxShadow: 'var(--shadow-sm)',
                 padding: '16px',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 animation: deletingSheetId === sheet.id 
@@ -689,23 +518,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{sheet.name}</span>
-                      {isActive && (
-                        <span style={{ 
-                          fontSize: 9, 
-                          fontWeight: 700, 
-                          background: 'var(--success-light)', 
-                          color: 'var(--success)', 
-                          padding: '2px 6px', 
-                          borderRadius: '100px', 
-                          border: '1.5px solid var(--border)',
-                          letterSpacing: '0.03em' 
-                        }}>
-                          ACTIVE
-                        </span>
-                      )}
-                      {sheet.isDefault && <Star size={12} fill="#FFB300" color="#FFB300" />}
+                      {sheet.isDefault && <Star size={12} fill="#333" color="#333" />}
                     </div>
-                    <div style={{ fontSize: 12, color: '#8E8E93', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
                       {sheet.exercises?.length || 0} exercises
                       {sheet.startDate && sheet.endDate && ` · ${sheet.startDate} to ${sheet.endDate}`}
                     </div>
@@ -716,7 +531,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   height: 28,
                   borderRadius: '50%',
                   background: 'var(--bg-secondary)',
-                  border: '2.2px solid var(--border)',
+                  border: '2px solid var(--border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -749,7 +564,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           alignItems: 'center', 
                           gap: 12,
                           padding: '12px 14px', 
-                          background: isActive ? 'var(--bg-card)' : 'var(--bg-secondary)', 
+                          background: 'var(--bg-secondary)', 
                           borderRadius: '14px',
                           border: '2px solid var(--border)',
                           boxShadow: 'var(--shadow-sm)',
@@ -759,7 +574,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                             height: 32,
                             borderRadius: '8px',
                             background: 'var(--bg-card)',
-                            border: '1.5px solid var(--border)',
+                            border: '2px solid var(--border)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -776,11 +591,11 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                             <span style={{ 
                               fontSize: 9, 
                               fontWeight: 700, 
-                              background: 'var(--warning-light)', 
+                              background: 'var(--bg-tertiary)', 
                               color: 'var(--text-primary)', 
                               padding: '2px 6px', 
                               borderRadius: '100px', 
-                              border: '1.5px solid var(--border)',
+                              border: '2px solid var(--border)',
                               letterSpacing: '0.03em' 
                             }}>
                               AMRAP
@@ -793,54 +608,6 @@ export default function WorkoutSheets({ isEmbedded = false }) {
 
                   {/* Action Buttons */}
                   <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-                    {!isActive ? (
-                      <button 
-                        className="btn btn-primary"
-                        style={{ 
-                          flex: 1.5, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          gap: 6,
-                          background: 'var(--accent-blue)',
-                          color: '#FFFFFF',
-                          border: '2px solid var(--border)',
-                          borderRadius: '12px',
-                          boxShadow: 'var(--shadow-sm)',
-                          padding: '10px 16px',
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                        }} 
-                        onClick={() => handleActivate(sheet)}
-                      >
-                        <Play size={14} strokeWidth={2.4} /> Activate
-                      </button>
-                    ) : (
-                      <button 
-                        className="btn btn-outline"
-                        style={{ 
-                          flex: 1.5, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          gap: 6,
-                          background: 'var(--bg-card)',
-                          color: 'var(--danger)',
-                          border: '2px solid var(--border)',
-                          borderRadius: '12px',
-                          boxShadow: 'var(--shadow-sm)',
-                          padding: '10px 16px',
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                        }} 
-                        onClick={handleDeactivate}
-                      >
-                        <RotateCcw size={14} strokeWidth={2.4} /> Deactivate
-                      </button>
-                    )}
-                    
                     {!sheet.isDefault && (
                       <button 
                         className="sheet-btn"
@@ -882,27 +649,25 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                       <Edit3 size={14} strokeWidth={2.4} color="var(--text-primary)" />
                     </button>
 
-                    {sheets.length > 1 && (
-                      <button
-                        className="sheet-btn"
-                        style={{ 
-                          width: 38,
-                          height: 38,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'var(--bg-card)', 
-                          color: 'var(--danger)',
-                          border: '2px solid var(--border)',
-                          borderRadius: '12px',
-                          boxShadow: 'var(--shadow-sm)',
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => setShowDeleteConfirm(sheet.id)}
-                      >
-                        <Trash2 size={14} strokeWidth={2.4} />
-                      </button>
-                    )}
+                    <button
+                      className="sheet-btn"
+                      style={{ 
+                        width: 38,
+                        height: 38,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--bg-card)', 
+                        color: 'var(--text-primary)',
+                        border: '2px solid var(--border)',
+                        borderRadius: '12px',
+                        boxShadow: 'var(--shadow-sm)',
+                        cursor: 'pointer',
+                      }}
+                      onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(sheet.id); }}
+                    >
+                      <Trash2 size={14} strokeWidth={2.4} />
+                    </button>
                   </div>
                 </div>
               )}
@@ -913,15 +678,15 @@ export default function WorkoutSheets({ isEmbedded = false }) {
 
       {/* Create New Sheet Button */}
       <button 
-        className="btn btn-primary"
+        className="sheet-btn"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
           width: '100%',
-          background: 'var(--accent-purple)',
-          color: '#FFFFFF',
+          background: 'var(--text-primary)',
+          color: 'var(--bg-primary)',
           border: '2px solid var(--border)',
           borderRadius: '14px',
           padding: '14px 20px',
@@ -935,9 +700,58 @@ export default function WorkoutSheets({ isEmbedded = false }) {
         <Plus size={16} strokeWidth={2.4} /> Create New Workout Sheet
       </button>
 
-      <div style={{ fontSize: 12, color: '#AEAEB2', textAlign: 'center', marginTop: 16, lineHeight: 1.4 }}>
-        Activate one sheet per week. Alternate between sheets for progressive overload.
-      </div>
+      {/* ===== DAY PICKER MODAL ===== */}
+      <Modal
+        isOpen={!!dayPickerDay}
+        onClose={() => setDayPickerDay(null)}
+        title={dayPickerDay ? `Select Routine for ${WEEKDAYS.find(d => d.key === dayPickerDay)?.label}` : ''}
+        type="bottom-sheet"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 16 }}>
+          <button
+            className="sheet-btn"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+              padding: '14px', background: !schedule[dayPickerDay] ? 'var(--bg-secondary)' : 'var(--bg-card)',
+              borderRadius: '12px', border: '2px solid var(--border)', cursor: 'pointer',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+            onClick={() => handleAssignRoutine(dayPickerDay, null)}
+          >
+            <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'var(--bg-primary)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={16} color="var(--text-primary)" strokeWidth={2.4} />
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Rest Day (none)</div>
+            {!schedule[dayPickerDay] && <Check size={18} strokeWidth={2.4} style={{ marginLeft: 'auto', color: 'var(--text-primary)' }} />}
+          </button>
+          
+          {sheets.map(sheet => {
+            const isAssigned = schedule[dayPickerDay] === sheet.id;
+            return (
+              <button
+                key={sheet.id}
+                className="sheet-btn"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                  padding: '14px', background: isAssigned ? 'var(--bg-secondary)' : 'var(--bg-card)',
+                  borderRadius: '12px', border: '2px solid var(--border)', cursor: 'pointer',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+                onClick={() => handleAssignRoutine(dayPickerDay, sheet.id)}
+              >
+                <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'var(--text-primary)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Dumbbell size={16} color="var(--bg-primary)" strokeWidth={2.4} />
+                </div>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{sheet.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{sheet.exercises.length} exercises</div>
+                </div>
+                {isAssigned && <Check size={18} strokeWidth={2.4} style={{ marginLeft: 'auto', color: 'var(--text-primary)' }} />}
+              </button>
+            )
+          })}
+        </div>
+      </Modal>
 
       {/* ===== SHEET EDITOR MODAL ===== */}
       {editingSheet && (
@@ -948,7 +762,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
           type="bottom-sheet"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 16 }}>
-            {/* Sheet Info Card — iOS Settings Grouped Table Style */}
+            {/* Sheet Info Card */}
             <div style={{
               background: 'var(--bg-card)',
               borderRadius: '14px',
@@ -963,7 +777,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                 padding: '12px 16px',
                 borderBottom: '2px solid var(--border)',
               }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Sheet Name *</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Sheet Name *</label>
                 <input
                   style={{
                     width: '100%',
@@ -985,9 +799,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
               {/* Row 2: Description */}
               <div className="ios-form-row" style={{
                 padding: '12px 16px',
-                borderBottom: '1px solid var(--border-light)',
+                borderBottom: '2px solid var(--border)',
               }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Description</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Description</label>
                 <input
                   style={{
                     width: '100%',
@@ -1010,9 +824,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
                 <div className="ios-form-row" style={{
                   padding: '12px 16px',
-                  borderRight: '1px solid var(--border-light)',
+                  borderRight: '2px solid var(--border)',
                 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                     <Calendar size={11} strokeWidth={2.4} /> Start Date
                   </label>
                   <input
@@ -1035,7 +849,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                 <div className="ios-form-row" style={{
                   padding: '12px 16px',
                 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                     <Calendar size={11} strokeWidth={2.4} /> End Date
                   </label>
                   <input
@@ -1060,7 +874,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
 
             {/* Exercises in Sheet */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContainer: 'space-between', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Exercises ({editingSheet.exercises.length})</span>
                 {editingSheet.exercises.length >= 2 && (
                   <button
@@ -1068,15 +882,15 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                     className="sheet-btn"
                     style={{ 
                       background: 'var(--bg-card)', 
-                      color: '#007AFF', 
+                      color: 'var(--text-primary)', 
                       fontSize: 11, 
-                      fontWeight: 600,
+                      fontWeight: 700,
                       display: 'flex',
                       alignItems: 'center',
                       gap: 4,
                        border: '2px solid var(--border)',
                       borderRadius: '8px',
-                      padding: '4px 10px',
+                      padding: '6px 10px',
                       cursor: 'pointer',
                       boxShadow: 'var(--shadow-sm)',
                     }}
@@ -1089,9 +903,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
 
               {editingSheet.exercises.length === 0 && (
                 <div style={{ padding: '24px 16px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '16px', border: '2px dashed var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-                  <Dumbbell size={28} strokeWidth={2.2} color="#8E8E93" style={{ marginBottom: 8 }} />
-                  <div style={{ fontSize: 13, color: '#8E8E93', fontWeight: 500 }}>No exercises added yet</div>
-                  <div style={{ fontSize: 11, color: '#AEAEB2', marginTop: 2 }}>Tap "Add Exercise" below</div>
+                  <Dumbbell size={28} strokeWidth={2.2} color="var(--text-tertiary)" style={{ marginBottom: 8 }} />
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>No exercises added yet</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Tap "Add Exercise" below</div>
                 </div>
               )}
 
@@ -1120,11 +934,13 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                         opacity: isDragging ? 0.4 : 1,
                         transform: isDragging ? 'scale(0.96)' : 'scale(1)',
-                        boxShadow: isDragging ? '0 12px 24px rgba(0,0,0,0.08)' : 'var(--shadow-sm)',
-                        animation: 'sheetsExInsert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        boxShadow: isDragging ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+                        animation: removingExIdx === i
+                          ? 'sheetsExRemove 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                          : 'sheetsExInsert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                       }}
                     >
-                      {/* Collapsed Header — always visible */}
+                      {/* Collapsed Header */}
                       <div
                         onClick={() => setExpandedExIdx(isOpen ? null : i)}
                         style={{
@@ -1136,15 +952,13 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           userSelect: 'none',
                         }}
                       >
-                        <GripVertical size={16} color="#C7C7CC" style={{ cursor: 'grab', flexShrink: 0 }} />
+                        <GripVertical size={16} color="var(--border-light)" style={{ cursor: 'grab', flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0, paddingLeft: 4 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                             {renderExerciseIcon(type, 13)}
                             <span>{info.name}</span>
                           </div>
-                          <div style={{ fontSize: 11, color: '#8E8E93', display: 'flex', flexWrap: 'wrap', gap: '2px 8px', alignItems: 'center', marginTop: 2 }}>
-                            <span style={{ color: tierColor, fontWeight: 600 }}>{tierLabel}</span>
-                            <span>·</span>
+                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
                             <span>{summary}</span>
                           </div>
                         </div>
@@ -1152,12 +966,12 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           type="button"
                           className="sheet-btn"
                           style={{ 
-                            width: 24, 
-                            height: 24, 
-                            borderRadius: '50%',
-                            background: '#FFF0F0', 
-                            color: '#FF3B30', 
-                            border: 'none',
+                            width: 28, 
+                            height: 28, 
+                            borderRadius: '8px',
+                            background: 'var(--bg-secondary)', 
+                            color: 'var(--text-primary)', 
+                            border: '2px solid var(--border)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1166,13 +980,13 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           }}
                           onClick={(e) => { e.stopPropagation(); removeExerciseFromSheet(i); }}
                         >
-                          <Trash2 size={12} strokeWidth={2.4} />
+                          <Trash2 size={14} strokeWidth={2.4} />
                         </button>
                       </div>
 
                       {/* Expanded Config */}
                       {isOpen && (
-                        <div className="ex-config-container" style={{ padding: '0 14px 14px', borderTop: '1px solid var(--border-light)', background: '#F9F9FB' }}>
+                        <div className="ex-config-container" style={{ padding: '0 14px 14px', borderTop: '2px solid var(--border)', background: 'var(--bg-secondary)' }}>
                           <div style={{ display: 'flex', gap: 4, marginTop: 10, marginBottom: 10 }}>
                             <button 
                               type="button" 
@@ -1192,7 +1006,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                               onClick={() => moveExercise(i, -1)} 
                               disabled={i === 0}
                             >
-                              <ChevronUp size={14} strokeWidth={2.4} color={i === 0 ? '#C7C7CC' : 'var(--text-primary)'} />
+                              <ChevronUp size={14} strokeWidth={2.4} color={i === 0 ? 'var(--text-tertiary)' : 'var(--text-primary)'} />
                             </button>
                             <button 
                               type="button" 
@@ -1212,16 +1026,16 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                               onClick={() => moveExercise(i, 1)} 
                               disabled={i === editingSheet.exercises.length - 1}
                             >
-                              <ChevronDown size={14} strokeWidth={2.4} color={i === editingSheet.exercises.length - 1 ? '#C7C7CC' : 'var(--text-primary)'} />
+                              <ChevronDown size={14} strokeWidth={2.4} color={i === editingSheet.exercises.length - 1 ? 'var(--text-tertiary)' : 'var(--text-primary)'} />
                             </button>
-                            <div style={{ flex: 1, fontSize: 11, color: '#8E8E93', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontWeight: 500 }}>
+                            <div style={{ flex: 1, fontSize: 11, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontWeight: 600 }}>
                               Targeting: {info.muscle}
                             </div>
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                             <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: '#8E8E93', marginBottom: 4, textTransform: 'uppercase' }}>Min Sets</label>
+                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Min Sets</label>
                               <input 
                                 type="number" 
                                 inputMode="numeric" 
@@ -1243,17 +1057,11 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                                 }}
                                 value={ex.minSets || ex.sets || 3} 
                                 onChange={e => updateExerciseInSheet(i, 'minSets', +e.target.value)} 
-                                onFocus={(e) => {
-                                  e.target.style.borderColor = 'var(--accent-purple)';
-                                  handleFocus(e);
-                                }}
-                                onBlur={(e) => {
-                                  e.target.style.borderColor = 'var(--border)';
-                                }}
+                                onFocus={handleFocus}
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: '#8E8E93', marginBottom: 4, textTransform: 'uppercase' }}>Max Sets</label>
+                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Max Sets</label>
                               <input 
                                 type="number" 
                                 inputMode="numeric" 
@@ -1275,17 +1083,11 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                                 }}
                                 value={ex.maxSets || ex.minSets || ex.sets || 5} 
                                 onChange={e => updateExerciseInSheet(i, 'maxSets', +e.target.value)} 
-                                onFocus={(e) => {
-                                  e.target.style.borderColor = 'var(--accent-purple)';
-                                  handleFocus(e);
-                                }}
-                                onBlur={(e) => {
-                                  e.target.style.borderColor = 'var(--border)';
-                                }}
+                                onFocus={handleFocus}
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: '#8E8E93', marginBottom: 4, textTransform: 'uppercase' }}>Reps</label>
+                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Reps</label>
                               <input 
                                 type="number" 
                                 inputMode="numeric" 
@@ -1307,17 +1109,11 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                                 }}
                                 value={ex.reps} 
                                 onChange={e => updateExerciseInSheet(i, 'reps', +e.target.value)} 
-                                onFocus={(e) => {
-                                  e.target.style.borderColor = 'var(--accent-purple)';
-                                  handleFocus(e);
-                                }}
-                                onBlur={(e) => {
-                                  e.target.style.borderColor = 'var(--border)';
-                                }}
+                                onFocus={handleFocus}
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: '#8E8E93', marginBottom: 4, textTransform: 'uppercase' }}>Weight (kg)</label>
+                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Weight (kg)</label>
                               <input 
                                 type="number" 
                                 inputMode="decimal" 
@@ -1340,20 +1136,14 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                                 placeholder="0" 
                                 value={ex.weight || ''} 
                                 onChange={e => updateExerciseInSheet(i, 'weight', +e.target.value)} 
-                                onFocus={(e) => {
-                                  e.target.style.borderColor = 'var(--accent-purple)';
-                                  handleFocus(e);
-                                }}
-                                onBlur={(e) => {
-                                  e.target.style.borderColor = 'var(--border)';
-                                }}
+                                onFocus={handleFocus}
                               />
                             </div>
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                             <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: '#8E8E93', marginBottom: 4, textTransform: 'uppercase' }}>Rest (min)</label>
+                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Rest (min)</label>
                               <input 
                                 type="number" 
                                 inputMode="decimal" 
@@ -1376,13 +1166,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                                 }}
                                 value={ex.restMinutes} 
                                 onChange={e => updateExerciseInSheet(i, 'restMinutes', +e.target.value)} 
-                                onFocus={(e) => {
-                                  e.target.style.borderColor = 'var(--accent-purple)';
-                                  handleFocus(e);
-                                }}
-                                onBlur={(e) => {
-                                  e.target.style.borderColor = 'var(--border)';
-                                }}
+                                onFocus={handleFocus}
                               />
                             </div>
                             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -1393,8 +1177,8 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                                 style={{
                                   width: '100%',
                                   height: '37px',
-                                  background: ex.amrap ? 'var(--accent-blue-light)' : 'var(--bg-card)',
-                                  color: ex.amrap ? 'var(--accent-blue)' : 'var(--text-primary)',
+                                  background: ex.amrap ? 'var(--text-primary)' : 'var(--bg-card)',
+                                  color: ex.amrap ? 'var(--bg-primary)' : 'var(--text-primary)',
                                   border: '2px solid var(--border)',
                                   borderRadius: '10px',
                                   fontSize: 12,
@@ -1408,7 +1192,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                                   boxShadow: 'var(--shadow-sm)'
                                 }}
                               >
-                                <Check size={12} strokeWidth={2.4} color={ex.amrap ? '#007AFF' : '#8E8E93'} />
+                                <Check size={14} strokeWidth={2.4} color={ex.amrap ? 'var(--bg-primary)' : 'var(--text-tertiary)'} />
                                 AMRAP
                               </button>
                             </div>
@@ -1431,12 +1215,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                             placeholder="Notes (optional)"
                             value={ex.notes || ''} 
                             onChange={e => updateExerciseInSheet(i, 'notes', e.target.value)}
-                            onFocus={(e) => {
-                              e.target.style.borderColor = 'var(--accent-purple)';
-                            }}
-                            onBlur={(e) => {
-                              e.target.style.borderColor = 'var(--border)';
-                            }}
+                            onFocus={handleFocus}
                           />
                         </div>
                       )}
@@ -1462,7 +1241,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   borderRadius: '12px',
                   padding: '12px 16px',
                   fontSize: 13,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: 'pointer',
                   boxShadow: 'var(--shadow-sm)',
                 }}
@@ -1481,14 +1260,15 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                 justifyContent: 'center',
                 gap: 6,
                 width: '100%',
-                background: editingSheet.name.trim() ? 'var(--text-primary)' : '#AEAEB2',
-                color: '#FFFFFF',
-                border: 'none',
+                background: editingSheet.name.trim() ? 'var(--text-primary)' : 'var(--bg-secondary)',
+                color: editingSheet.name.trim() ? 'var(--bg-primary)' : 'var(--text-tertiary)',
+                border: '2px solid var(--border)',
                 borderRadius: '14px',
                 padding: '14px 20px',
                 fontSize: 14,
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: editingSheet.name.trim() ? 'pointer' : 'default',
+                boxShadow: 'var(--shadow-sm)',
               }}
               onClick={handleSaveSheet}
               disabled={!editingSheet.name.trim()}
@@ -1496,6 +1276,50 @@ export default function WorkoutSheets({ isEmbedded = false }) {
               <Check size={16} strokeWidth={2.4} /> {editingSheet.id ? 'Save Changes' : 'Create Sheet'}
             </button>
           </div>
+
+          {/* Undo Toast */}
+          {undoExercise && (
+            <div style={{
+              position: 'sticky',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: '12px 16px',
+              background: 'var(--text-primary)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              borderRadius: '14px',
+              margin: '12px 0 0',
+              border: '2px solid var(--border)',
+              boxShadow: 'var(--shadow-md)',
+              animation: 'sheetsExInsert 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Removed {undoExercise.name}
+              </span>
+              <button
+                className="sheet-btn"
+                onClick={handleUndoRemove}
+                style={{
+                  background: 'transparent',
+                  color: '#FFFFFF',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 14px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                Undo
+              </button>
+            </div>
+          )}
         </Modal>
       )}
 
@@ -1506,7 +1330,6 @@ export default function WorkoutSheets({ isEmbedded = false }) {
         title="Add Exercise"
         type="bottom-sheet"
       >
-        {/* Search and filters container (scrolls out of view) */}
         <div style={{
           position: 'relative',
           background: 'var(--bg-secondary)',
@@ -1522,7 +1345,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
         }}>
           {/* Search bar */}
           <div style={{ position: 'relative' }}>
-            <Search size={16} strokeWidth={2.4} color="#8E8E93" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={16} strokeWidth={2.4} color="var(--text-tertiary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               placeholder="Search exercises..."
@@ -1541,12 +1364,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                 transition: 'all 0.2s',
                 boxShadow: 'var(--shadow-sm)',
               }}
-              onFocus={(e) => {
-                e.target.style.borderColor = 'var(--accent-purple)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = 'var(--border)';
-              }}
+              onFocus={handleFocus}
             />
             {catalogSearch && (
               <button
@@ -1558,7 +1376,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  color: '#8E8E93',
+                  color: 'var(--text-tertiary)',
                   padding: 0,
                   cursor: 'pointer',
                   display: 'flex',
@@ -1587,13 +1405,13 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   className="sheet-chip"
                   style={{
                     flexShrink: 0,
-                    background: isAct ? 'var(--accent-blue)' : 'var(--bg-card)',
-                    color: isAct ? 'var(--text-inverse)' : 'var(--text-primary)',
-                    border: isAct ? 'none' : '2px solid var(--border)',
+                    background: isAct ? 'var(--text-primary)' : 'var(--bg-card)',
+                    color: isAct ? 'var(--bg-primary)' : 'var(--text-primary)',
+                    border: '2px solid var(--border)',
                     borderRadius: '100px',
                     padding: '6px 14px',
                     fontSize: 12,
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     boxShadow: 'var(--shadow-sm)',
                   }}
@@ -1626,13 +1444,13 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   className="sheet-chip"
                   style={{
                     flexShrink: 0,
-                    background: isAct ? 'var(--accent-blue-light)' : 'var(--bg-card)',
-                    color: isAct ? 'var(--accent-blue)' : 'var(--text-tertiary)',
-                    border: isAct ? '2px solid var(--accent-blue)' : '2px solid var(--border)',
+                    background: isAct ? 'var(--text-primary)' : 'var(--bg-card)',
+                    color: isAct ? 'var(--bg-primary)' : 'var(--text-primary)',
+                    border: '2px solid var(--border)',
                     borderRadius: '100px',
                     padding: '5px 12px',
                     fontSize: 11,
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     boxShadow: 'var(--shadow-sm)',
                   }}
@@ -1657,10 +1475,10 @@ export default function WorkoutSheets({ isEmbedded = false }) {
             });
 
             const categoryGroups = [
-              { id: 'strength', name: 'Strength Training', icon: '🏋️' },
-              { id: 'calisthenics', name: 'Calisthenics & Bodyweight', icon: '🤸' },
-              { id: 'cardio', name: 'Cardio & Conditioning', icon: '🏃' },
-              { id: 'mobility', name: 'Mobility & Warm-up', icon: '🧘' }
+              { id: 'strength', name: 'Strength Training', icon: <Dumbbell size={14} strokeWidth={2.4} /> },
+              { id: 'calisthenics', name: 'Calisthenics & Bodyweight', icon: <Zap size={14} strokeWidth={2.4} /> },
+              { id: 'cardio', name: 'Cardio & Conditioning', icon: <Play size={14} strokeWidth={2.4} /> },
+              { id: 'mobility', name: 'Mobility & Warm-up', icon: <RotateCcw size={14} strokeWidth={2.4} /> }
             ];
 
             const grouped = categoryGroups.map(group => {
@@ -1670,9 +1488,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
 
             if (grouped.length === 0) {
               return (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8E8E93' }}>
-                  <AlertTriangle size={32} strokeWidth={2} style={{ marginBottom: 10, color: '#FF9500' }} />
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>No Exercises Found</div>
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-tertiary)' }}>
+                  <AlertTriangle size={32} strokeWidth={2} style={{ marginBottom: 10, color: 'var(--text-tertiary)' }} />
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>No Exercises Found</div>
                   <div style={{ fontSize: 12, marginBottom: 14 }}>Try adjusting your search terms or filters.</div>
                   <button
                     className="sheet-btn"
@@ -1683,12 +1501,12 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                     }}
                     style={{
                       background: 'var(--bg-card)',
-                      color: '#007AFF',
+                      color: 'var(--text-primary)',
                       border: '2px solid var(--border)',
                       borderRadius: '8px',
                       padding: '8px 16px',
                       fontSize: 13,
-                      fontWeight: 600,
+                      fontWeight: 700,
                       cursor: 'pointer',
                       boxShadow: 'var(--shadow-sm)',
                     }}
@@ -1711,7 +1529,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  color: '#8E8E93',
+                  color: 'var(--text-tertiary)',
                   padding: '12px 20px 6px 20px',
                   borderBottom: '2px solid var(--border)',
                   margin: '0 -20px 8px -20px',
@@ -1719,9 +1537,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                   alignItems: 'center',
                   gap: 6,
                 }}>
-                  <span>{group.icon}</span>
+                  <span style={{ display: 'flex' }}>{group.icon}</span>
                   <span>{group.name}</span>
-                  <span style={{ fontSize: 10, fontWeight: 500, color: '#C7C7CC' }}>({group.items.length})</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)' }}>({group.items.length})</span>
                 </div>
 
                 {/* Items */}
@@ -1740,7 +1558,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           gap: 12,
                           width: '100%',
                           padding: '12px 14px',
-                          background: alreadyAdded ? 'var(--success-light)' : 'var(--bg-card)',
+                          background: alreadyAdded ? 'var(--bg-secondary)' : 'var(--bg-card)',
                           borderRadius: '14px',
                           border: '2px solid var(--border)',
                           cursor: 'pointer',
@@ -1753,17 +1571,17 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                           width: 32,
                           height: 32,
                           borderRadius: '8px',
-                          background: 'var(--bg-tertiary)',
+                          background: 'var(--bg-card)',
+                          border: '2px solid var(--border)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 16,
                         }}>
-                          {ex.icon}
+                          {renderExerciseIcon(ex.type, 16)}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{ex.name}</div>
-                          <div style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{ex.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, fontWeight: 600 }}>
                             {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
                           </div>
                         </div>
@@ -1772,8 +1590,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
                             <span style={{ 
                               fontSize: 9, 
                               fontWeight: 700, 
-                              background: '#E5F6ED', 
-                              color: '#2E9E47', 
+                              background: 'var(--bg-primary)', 
+                              color: 'var(--text-primary)',
+                              border: '2px solid var(--border)',
                               padding: '2px 6px', 
                               borderRadius: '100px', 
                               letterSpacing: '0.03em',
@@ -1806,26 +1625,27 @@ export default function WorkoutSheets({ isEmbedded = false }) {
           width: 48,
           height: 48,
           borderRadius: '50%',
-          background: '#FFF0F0',
+          background: 'var(--bg-secondary)',
+          border: '2px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 12,
           margin: '0 auto 12px'
         }}>
-          <Trash2 size={22} strokeWidth={2.2} color="#FF3B30" />
+          <Trash2 size={22} strokeWidth={2.4} color="var(--text-primary)" />
         </div>
         <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, margin: 0 }}>Delete this sheet?</h2>
-        <p style={{ fontSize: 12, color: '#8E8E93', marginBottom: 20, lineHeight: 1.5, margin: '6px 0 20px' }}>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5, margin: '6px 0 20px', fontWeight: 600 }}>
           This action cannot be undone.
-          {activeSheet?.id === showDeleteConfirm && ' The active sheet will switch to your default.'}
+          {Object.values(schedule).includes(showDeleteConfirm) && ' It will be removed from your weekly schedule.'}
         </p>
         <div style={{ display: 'flex', gap: 8, width: '100%' }}>
           <button 
             className="sheet-btn"
             style={{ 
               flex: 1,
-              background: 'var(--bg-tertiary)',
+              background: 'var(--bg-secondary)',
               color: 'var(--text-primary)',
               border: '2px solid var(--border)',
               borderRadius: '12px',
@@ -1843,9 +1663,9 @@ export default function WorkoutSheets({ isEmbedded = false }) {
             className="sheet-btn"
             style={{ 
               flex: 1,
-              background: '#FFF0F0',
-              color: '#FF3B30',
-              border: '2px solid #FFD1D1',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              border: '2px solid var(--border)',
               borderRadius: '12px',
               padding: '10px 16px',
               fontSize: 13,
@@ -1857,7 +1677,7 @@ export default function WorkoutSheets({ isEmbedded = false }) {
               gap: 4,
               boxShadow: 'var(--shadow-sm)',
             }} 
-            onClick={() => handleDelete(showDeleteConfirm)}
+            onClick={(e) => { e.stopPropagation(); handleDelete(showDeleteConfirm); }}
           >
             <Trash2 size={12} strokeWidth={2.4} /> Delete
           </button>
@@ -1865,39 +1685,47 @@ export default function WorkoutSheets({ isEmbedded = false }) {
       </Modal>
 
       {/* ── Toast Notification ── */}
-      {toast && (
+      {toast && createPortal(
         <div style={{
           position: 'fixed', 
           bottom: 100, 
           left: '50%',
-          transform: 'translateX(-50%)',
           display: 'flex', 
           justifyContent: 'center', 
           zIndex: 9999,
-          width: 'calc(100% - 32px)',
-          maxWidth: 400,
+          animation: toast.phase === 'exit'
+            ? 'toastSlideOut 0.3s ease-in forwards'
+            : 'toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          pointerEvents: toast.phase === 'exit' ? 'none' : 'auto',
         }}>
           <div style={{
-            background: 'var(--text-primary)',
-            color: '#FFFFFF', 
-            padding: '12px 20px', 
-            borderRadius: '20px', 
+            background: toast.type === 'warning' ? 'rgba(180,80,20,0.92)' : 'rgba(17,17,17,0.88)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            color: '#FFFFFF',
+            border: '1px solid rgba(255,255,255,0.12)',
+            padding: '14px 24px', 
+            borderRadius: 50, 
             fontSize: 13, 
-            fontWeight: 600,
-            boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
+            fontWeight: 700,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.1)',
             display: 'flex', 
             alignItems: 'center', 
             gap: 10,
             lineHeight: 1.4,
+            whiteSpace: 'nowrap',
           }}>
             {toast.type === 'success' ? (
-              <Check size={16} strokeWidth={2.5} color="#34C759" />
+              <Check size={16} strokeWidth={2.5} />
+            ) : toast.type === 'warning' ? (
+              <AlertTriangle size={16} strokeWidth={2.5} />
             ) : (
-              <AlertTriangle size={16} strokeWidth={2.5} color="#FF9500" />
+              <Check size={16} strokeWidth={2.5} />
             )}
             <span>{toast.message}</span>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

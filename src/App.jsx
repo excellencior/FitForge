@@ -1,10 +1,9 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Dumbbell, UtensilsCrossed, TrendingUp, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Play, ClipboardList, TrendingUp } from 'lucide-react';
 import { lazy, Suspense, useEffect } from 'react';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Workout = lazy(() => import('./pages/Workout'));
-const Diet = lazy(() => import('./pages/Diet'));
 const Progress = lazy(() => import('./pages/Progress'));
 const Profile = lazy(() => import('./pages/Profile'));
 const WorkoutSheets = lazy(() => import('./pages/WorkoutSheets'));
@@ -14,8 +13,8 @@ function LoadingSpinner() {
     <div className="page-content flex items-center justify-center" style={{ minHeight: '60vh' }}>
       <div style={{
         width: 40, height: 40,
-        border: '3px solid var(--border)',
-        borderTopColor: 'var(--accent-blue)',
+        border: '3px solid var(--border-light)',
+        borderTopColor: 'var(--text-primary)',
         borderRadius: '50%',
         animation: 'spin 0.8s linear infinite',
       }} />
@@ -26,8 +25,8 @@ function LoadingSpinner() {
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Home' },
-  { path: '/workout', icon: Dumbbell, label: 'Workout' },
-  { path: '/diet', icon: UtensilsCrossed, label: 'Diet' },
+  { path: '/track', icon: Play, label: 'Track' },
+  { path: '/routines', icon: ClipboardList, label: 'Routines' },
   { path: '/progress', icon: TrendingUp, label: 'Progress' },
 ];
 
@@ -44,11 +43,10 @@ export default function App() {
         <Suspense fallback={<LoadingSpinner />}>
           <Routes location={location}>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/workout" element={<Workout />} />
-            <Route path="/diet" element={<Diet />} />
+            <Route path="/track" element={<Workout />} />
+            <Route path="/routines" element={<WorkoutSheets />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/sheets" element={<WorkoutSheets />} />
           </Routes>
         </Suspense>
       </div>

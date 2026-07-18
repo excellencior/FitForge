@@ -43,7 +43,7 @@ echo -e "${GREEN}  ✓ Capacitor sync complete${NC}"
 # ─── Step 3: Build debug APK ───
 echo -e "\n${YELLOW}[3/4]${NC} Building Android APK (this may take a few minutes)..."
 cd "$SCRIPT_DIR/android"
-./gradlew assembleDebug
+gradle assembleDebug
 echo -e "${GREEN}  ✓ APK build complete${NC}"
 
 # ─── Step 4: Copy APK to release ───

@@ -1,51 +1,47 @@
 /* ============================
-   FitForge — Design System v3
-   iOS-Clean White Theme
-   Google Sans / Plus Jakarta Sans
+   FitForge — Design System v4
+   Pure Light Monochrome
+   Inter — Clean, Minimal
    ============================ */
 
 :root {
-  /* Colors — 60/30/10 Division Scheme — Matte Colorful "Tia" Style */
+  /* Colors — Pure Monochrome */
   --bg-primary: #FFFFFF;
-  --bg-secondary: #FAF6F0; /* Soft warm matte cream */
-  --bg-tertiary: #F2EBE1;  /* Slightly deeper warm cream for inputs/muted blocks */
-  --bg-card: #FFFFFF;      /* Pure white cards */
-  --bg-glass: rgba(255, 255, 255, 0.75);
+  --bg-secondary: #F5F5F5;
+  --bg-tertiary: #EBEBEB;
+  --bg-card: #FFFFFF;
+  --bg-glass: rgba(255, 255, 255, 0.8);
   
-  --text-primary: #2C2621;   /* Organic deep matte charcoal/dark brown */
-  --text-secondary: #5C524A; /* Warm matte brown-gray */
-  --text-tertiary: #8C7E74;  /* Soft earthy clay-gray */
+  --text-primary: #111111;
+  --text-secondary: #555555;
+  --text-tertiary: #999999;
   --text-inverse: #FFFFFF;
   
-  --accent-blue: #E27D60;       /* Matte terracotta */
-  --accent-blue-light: #F9ECE8; /* Terracotta light tint */
-  --accent-purple: #85586F;     /* Rich matte raspberry/plum */
-  --accent-purple-light: #F3ECEF; /* Raspberry light tint */
-  --accent-gradient: linear-gradient(135deg, #E27D60, #85586F); /* Premium matte gradient */
-  --accent-gradient-soft: linear-gradient(135deg, #F9ECE8, #F3ECEF);
+  --accent-blue: #333333;
+  --accent-blue-light: #F0F0F0;
+  --accent-purple: #222222;
+  --accent-purple-light: #F0F0F0;
+  --accent-gradient: #222222;
+  --accent-gradient-soft: #F0F0F0;
   
-  --success: #6E8E75;       /* Matte sage green */
-  --success-light: #EEF3EF;
-  --warning: #E8A87C;       /* Matte apricot gold */
-  --warning-light: #FAF2EB;
-  --danger: #C38D9E;        /* Matte dusty rose */
-  --danger-light: #FAF0F2;
-  --info: #5B8296;          /* Matte slate blue */
-  --info-light: #EEF3F5;
+  --success: #333333;
+  --success-light: #F0F0F0;
+  --warning: #666666;
+  --warning-light: #F0F0F0;
+  --danger: #888888;
+  --danger-light: #F0F0F0;
+  --info: #555555;
+  --info-light: #F0F0F0;
   
-  --protein-color: #E27D60;
-  --carbs-color: #E8A87C;
-  --fat-color: #C38D9E;
+  --border: #222222;
+  --border-light: #DDDDDD;
+  --glass-border: rgba(0, 0, 0, 0.1);
   
-  --border: #2C2621;        /* Distinctive warm dark charcoal border */
-  --border-light: #D9CFC4;  /* Softer earthy separator */
-  --glass-border: rgba(44, 38, 33, 0.15);
-  
-  /* Shadows — Matte Neo-Brutalist Solid Offset */
-  --shadow-sm: 2px 2px 0px #2C2621;
-  --shadow-md: 4px 4px 0px #2C2621;
-  --shadow-lg: 6px 6px 0px #2C2621;
-  --shadow-xl: 8px 8px 0px #2C2621;
+  /* Shadows — Monochrome Neo-Brutalist Solid Offset */
+  --shadow-sm: 2px 2px 0px #222222;
+  --shadow-md: 4px 4px 0px #222222;
+  --shadow-lg: 6px 6px 0px #222222;
+  --shadow-xl: 8px 8px 0px #222222;
   
   /* Spacing */
   --space-xs: 4px;
@@ -55,7 +51,7 @@
   --space-xl: 32px;
   --space-2xl: 48px;
   
-  /* Radius — Playful but geometric */
+  /* Radius — Geometric, clean */
   --radius-sm: 10px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -76,15 +72,15 @@
   --transition-base: var(--duration-short) var(--ease-standard);
   --transition-slow: var(--duration-base) var(--ease-standard);
   
-  --font-family: 'Google Sans', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   
   /* Layout */
   --nav-height: 64px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
   
-  --nav-bg: #FAF6F0;
-  --nav-border: #2C2621;
+  --nav-bg: #F5F5F5;
+  --nav-border: #222222;
 }
 
 /* ===== RESET ===== */
@@ -543,7 +539,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .badge-purple {
-  background: #EDE7F6;
+  background: #F0F0F0;
   color: var(--accent-purple);
 }
 
@@ -913,7 +909,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   border-color: var(--accent-purple) !important;
   box-shadow: 2px 2px 0px var(--border) !important;
-  background-color: #FFFFFF !important;
+  background-color: var(--bg-card) !important;
 }
 
 /* ===== DATE NAVIGATION SLIDING ANIMATIONS ===== */
@@ -944,42 +940,6 @@ input:focus, select:focus, textarea:focus {
 @keyframes dashMilestonePop {
   0% { transform: scale(0.9) translateY(20px); opacity: 0; }
   100% { transform: scale(1) translateY(0); opacity: 1; }
-}
-
-/* ===== DIET TRACKER KEYFRAMES ===== */
-@keyframes dietToastSlideUp {
-  from { transform: translateY(24px) scale(0.95); opacity: 0; }
-  to   { transform: translateY(0) scale(1);       opacity: 1; }
-}
-@keyframes dietPopIn {
-  0%   { transform: scale(0.6); opacity: 0; }
-  60%  { transform: scale(1.15); }
-  100% { transform: scale(1);   opacity: 1; }
-}
-@keyframes dietRingDraw {
-  from { stroke-dasharray: 0 999; }
-}
-@keyframes dietRowFlash {
-  0%   { opacity: 1; transform: scale(1); max-height: 80px; padding-top: 8px; padding-bottom: 8px; border-bottom-width: 0.5px; overflow: hidden; }
-  100% { opacity: 0; transform: scale(0.95); max-height: 0; padding-top: 0; padding-bottom: 0; margin: 0; border: none; overflow: hidden; }
-}
-@keyframes dietDelBtnAnim {
-  0%   { transform: scale(1); color: #C7C7CC; }
-  50%  { transform: scale(1.4) rotate(-30deg); color: #FF3B30; }
-  100% { transform: scale(0); opacity: 0; }
-}
-@keyframes dietRowInsert {
-  0%   { opacity: 0; transform: translateY(-10px) scale(0.97); max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
-  100% { opacity: 1; transform: translateY(0) scale(1); max-height: 100px; padding-top: 8px; padding-bottom: 8px; }
-}
-@keyframes dietMealExpand {
-  from { opacity: 0; max-height: 0; }
-  to   { opacity: 1; max-height: 1000px; }
-}
-@keyframes dietStarPop {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.35); }
-  100% { transform: scale(1); }
 }
 
 
