@@ -1,9 +1,10 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Play, ClipboardList, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Play, ClipboardList, TrendingUp, StickyNote } from 'lucide-react';
 import { lazy, Suspense, useEffect } from 'react';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Workout = lazy(() => import('./pages/Workout'));
+const Notes = lazy(() => import('./pages/Notes'));
 const Progress = lazy(() => import('./pages/Progress'));
 const Profile = lazy(() => import('./pages/Profile'));
 const WorkoutSheets = lazy(() => import('./pages/WorkoutSheets'));
@@ -26,6 +27,7 @@ function LoadingSpinner() {
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Home' },
   { path: '/track', icon: Play, label: 'Track' },
+  { path: '/notes', icon: StickyNote, label: 'Notes' },
   { path: '/routines', icon: ClipboardList, label: 'Routines' },
   { path: '/progress', icon: TrendingUp, label: 'Progress' },
 ];
@@ -44,6 +46,7 @@ export default function App() {
           <Routes location={location}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/track" element={<Workout />} />
+            <Route path="/notes" element={<Notes />} />
             <Route path="/routines" element={<WorkoutSheets />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/profile" element={<Profile />} />

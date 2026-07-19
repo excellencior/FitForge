@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   PR_RECORDS: 'fitforge_pr_records',
   DELOAD_TRACKER: 'fitforge_deload',
   WEEK_COUNTER: 'fitforge_week_counter',
+  DAILY_NOTES: 'fitforge_daily_notes',
 };
 
 function getItem(key) {
@@ -305,6 +306,19 @@ export function setActiveSheet(sheetId) {
   return null;
 }
 
+// ===== DAILY NOTES =====
+export function getDailyNotes() {
+  return getItem(STORAGE_KEYS.DAILY_NOTES) || {
+    sun: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '',
+  };
+}
+
+export function saveDailyNote(dayKey, text) {
+  const notes = getDailyNotes();
+  notes[dayKey] = text;
+  setItem(STORAGE_KEYS.DAILY_NOTES, notes);
+}
+
 // Export all
 export default {
   getWorkoutLogs, saveWorkoutLog, getWorkoutsByDate, getWorkoutsThisWeek,
@@ -315,4 +329,5 @@ export default {
   getWorkoutSheets, saveWorkoutSheet, deleteWorkoutSheet,
   getRoutineSchedule, saveRoutineSchedule, getTodayRoutine, getRoutineForDay,
   getActiveSheet, setActiveSheet,
+  getDailyNotes, saveDailyNote,
 };
