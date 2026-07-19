@@ -50,7 +50,7 @@ echo -e "${GREEN}  ✓ APK build complete${NC}"
 echo -e "\n${YELLOW}[4/4]${NC} Copying APK to release/..."
 cd "$SCRIPT_DIR"
 mkdir -p "$RELEASE_DIR"
-cp "$APK_OUTPUT" "$RELEASE_DIR/FitForge.apk"
+cp "$APK_OUTPUT" "$RELEASE_DIR/FitForge-1.0.apk"
 
 APK_SIZE=$(du -h "$RELEASE_DIR/FitForge.apk" | cut -f1)
 

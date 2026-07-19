@@ -92,12 +92,6 @@ function GymAttendanceTracker() {
 
   return (
     <section style={attendanceStyles.card}>
-      <div style={attendanceStyles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1 }}>{totalSessions}</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.02em' }}>session{totalSessions !== 1 ? 's' : ''}</span>
-        </div>
-      </div>
 
       {/* Month Navigation */}
       <div style={attendanceStyles.monthNav}>
@@ -165,7 +159,7 @@ function GymAttendanceTracker() {
                 <Moon size={10} strokeWidth={2.2} color="var(--text-tertiary)" style={{ marginBottom: -1 }} />
               )}
               <span style={{
-                fontSize: (isPast && (cell.isGym || cell.isRestDay)) ? 9 : 12,
+                fontSize: (isPast && (cell.isGym || cell.isRestDay)) ? 11 : 14,
                 fontWeight: cell.isGym || cell.isToday ? '800' : '600',
                 color: cell.isGym ? '#FFFFFF' : (cell.isToday ? 'var(--text-primary)' : (isPast && cell.isRestDay ? 'var(--text-tertiary)' : (isDeload && !cell.isGym ? '#999999' : 'var(--text-secondary)'))),
                 lineHeight: 1,
@@ -383,11 +377,14 @@ const attendanceStyles = {
 export default function Dashboard() {
   const navigate = useNavigate();
   const today = getToday();
-  const uniqueDays = useMemo(() => {
+  const totalDays = useMemo(() => {
     const logs = getWorkoutLogs();
-    return new Set(logs.map(l => l.date)).size;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+    const prefix = `${y}-${String(m).padStart(2, '0')}`;
+    return new Set(logs.filter(l => l.date?.startsWith(prefix)).map(l => l.date)).size;
   }, []);
-  const totalDays = uniqueDays;
   const [todayWorkouts, setTodayWorkouts] = useState(() => getWorkoutsByDate(today));
 
   const refreshWorkouts = useCallback(() => {
@@ -431,7 +428,34 @@ export default function Dashboard() {
               style={styles.logoImage}
             />
           </div>
-          <p style={styles.dateLarge}>{formatDate(today)}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', height: 40 }}>
+            <span style={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: '#ffffff',
+              background: isRestDay ? '#166534' : '#1e40af',
+              border: 'none',
+              borderRadius: 100,
+              padding: '1px 10px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              lineHeight: 1.3,
+              width: 'fit-content',
+            }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
+            </span>
+            <span style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.02em',
+              textTransform: 'uppercase',
+              paddingLeft: 11,
+              lineHeight: 1,
+            }}>
+              {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+            </span>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
@@ -492,7 +516,7 @@ export default function Dashboard() {
               <Dumbbell size={18} strokeWidth={2.2} color="var(--text-primary)" />
             )}
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {isRestDay && (
               <span style={styles.workoutPillSub}>Recovery</span>
             )}
@@ -559,7 +583,6 @@ const styles = {
     height: 40,
     borderRadius: 12,
     overflow: 'hidden',
-    border: '2px solid var(--border)',
     boxShadow: 'var(--shadow-sm)',
     display: 'flex',
     alignItems: 'center',
@@ -633,13 +656,15 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
     display: 'block',
+    lineHeight: 1,
   },
   workoutPillTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: 'var(--text-primary)',
-    margin: '2px 0',
+    margin: 0,
     letterSpacing: '-0.02em',
+    lineHeight: 1.1,
   },
   workoutPillMeta: {
     fontSize: 12,

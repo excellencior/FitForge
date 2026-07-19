@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import { createPortal } from 'react-dom';
 import {
   getWorkoutSheets, saveWorkoutSheet, deleteWorkoutSheet,
@@ -90,6 +90,21 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
       animation: sheetsExConfigExpand 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       overflow: hidden;
     }
+    @keyframes catalogItemIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .catalog-item-anim {
+      animation: catalogItemIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+      will-change: transform, opacity;
+    }
+    @keyframes catalogDonePop {
+      from { opacity: 0; transform: translateX(-50%) scale(0.5); }
+      to { opacity: 1; transform: translateX(-50%) scale(1); }
+    }
+    .catalog-done-btn {
+      animation: catalogDonePop 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
   `;
   document.head.appendChild(sheet);
 }
@@ -168,15 +183,21 @@ export default function WorkoutSheets() {
   const handleFocus = useInputFocus();
   const { toast, show: showToast } = useToast();
 
+  const scrollRafRef = useRef(null);
   const handleCatalogScroll = (e) => {
-    const st = e.currentTarget.scrollTop;
-    if (st > 2 && !catalogExpandedRef.current) {
-      catalogExpandedRef.current = true;
-      setCatalogExpanded(true);
-    } else if (st <= 1 && catalogExpandedRef.current) {
-      catalogExpandedRef.current = false;
-      setCatalogExpanded(false);
-    }
+    const target = e.currentTarget;
+    if (scrollRafRef.current) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const st = target.scrollTop;
+      if (st > 2 && !catalogExpandedRef.current) {
+        catalogExpandedRef.current = true;
+        setCatalogExpanded(true);
+      } else if (st <= 1 && catalogExpandedRef.current) {
+        catalogExpandedRef.current = false;
+        setCatalogExpanded(false);
+      }
+    });
   };
 
   useModalLock(showEditor || showCatalog || !!showDeleteConfirm || !!dayPickerDay);
@@ -250,7 +271,7 @@ export default function WorkoutSheets() {
       showToast('Please enter a sheet name', 'warning');
       return;
     }
-    if (editingSheet.exercises.length === 0) {
+    if (!editingSheet.exercises || editingSheet.exercises.length === 0) {
       showToast('Add at least one exercise', 'warning');
       return;
     }
@@ -262,7 +283,7 @@ export default function WorkoutSheets() {
   };
 
   const toggleExerciseInSheet = (catalogExercise) => {
-    const alreadyAdded = editingSheet?.exercises.some(e => e.exerciseId === catalogExercise.id);
+    const alreadyAdded = editingSheet?.exercises?.some(e => e.exerciseId === catalogExercise.id);
     if (alreadyAdded) {
       // Remove it
       setEditingSheet(prev => ({
@@ -290,7 +311,7 @@ export default function WorkoutSheets() {
   };
 
   const removeExerciseFromSheet = (index) => {
-    const removed = editingSheet.exercises[index];
+    const removed = editingSheet.exercises?.[index];
     const removedInfo = getExerciseInfo(removed.exerciseId);
 
     // Clear any previous undo
@@ -388,6 +409,8 @@ export default function WorkoutSheets() {
 
 
   const handleAssignRoutine = (dayKey, sheetId) => {
+    // Already selected — do nothing
+    if (schedule[dayKey] === sheetId || (!schedule[dayKey] && !sheetId)) return;
     const newSchedule = { ...schedule, [dayKey]: sheetId };
     saveRoutineSchedule(newSchedule);
     setSchedule(newSchedule);
@@ -753,7 +776,7 @@ export default function WorkoutSheets() {
               letterSpacing: '-0.02em',
               flex: 1,
             }}>{editingSheet.id ? 'Edit Sheet' : 'New Sheet'}</h2>
-            {editingSheet.exercises.length > 0 ? (
+            {editingSheet.exercises?.length > 0 ? (
               <button
                 onClick={handleSaveSheet}
                 disabled={!editingSheet.name.trim()}
@@ -907,8 +930,8 @@ export default function WorkoutSheets() {
             {/* Exercises in Sheet */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Exercises ({editingSheet.exercises.length})</span>
-                {editingSheet.exercises.length >= 2 && (
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Exercises ({editingSheet.exercises?.length || 0})</span>
+                {editingSheet.exercises?.length >= 2 && (
                   <button
                     type="button"
                     className="sheet-btn"
@@ -933,7 +956,7 @@ export default function WorkoutSheets() {
                 )}
               </div>
 
-              {editingSheet.exercises.length === 0 && (
+              {(!editingSheet.exercises || editingSheet.exercises.length === 0) && (
                 <button
                   onClick={() => { exercisesSnapshot.current = [...(editingSheet?.exercises || [])]; setShowCatalog(true); }}
                   style={{ padding: '28px 16px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '16px', border: '2px dashed var(--border)', boxShadow: 'var(--shadow-sm)', width: '100%', cursor: 'pointer' }}
@@ -945,7 +968,7 @@ export default function WorkoutSheets() {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {editingSheet.exercises.map((ex, i) => {
+                {(editingSheet.exercises || []).map((ex, i) => {
                   const info = getExerciseInfo(ex.exerciseId);
                   const type = getExerciseType(ex.exerciseId);
                   const isOpen = expandedExIdx === i;
@@ -1059,9 +1082,9 @@ export default function WorkoutSheets() {
                                 boxShadow: 'var(--shadow-sm)',
                               }} 
                               onClick={() => moveExercise(i, 1)} 
-                              disabled={i === editingSheet.exercises.length - 1}
+                              disabled={i === (editingSheet.exercises?.length || 0) - 1}
                             >
-                              <ChevronDown size={14} strokeWidth={2.4} color={i === editingSheet.exercises.length - 1 ? 'var(--text-tertiary)' : 'var(--text-primary)'} />
+                              <ChevronDown size={14} strokeWidth={2.4} color={i === (editingSheet.exercises?.length || 0) - 1 ? 'var(--text-tertiary)' : 'var(--text-primary)'} />
                             </button>
                             <div style={{ flex: 1, fontSize: 11, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontWeight: 600 }}>
                               Targeting: {info.muscle}
@@ -1260,7 +1283,7 @@ export default function WorkoutSheets() {
               </div>
 
               {/* Add more row — only show when exercises exist */}
-              {editingSheet.exercises.length > 0 && (
+              {editingSheet.exercises?.length > 0 && (
                 <button
                   type="button"
                   onClick={() => { exercisesSnapshot.current = [...(editingSheet?.exercises || [])]; setShowCatalog(true); }}
@@ -1338,7 +1361,7 @@ export default function WorkoutSheets() {
         isOpen={showCatalog}
         onClose={() => {
           if (exercisesSnapshot.current !== null) {
-            setEditingSheet(prev => ({ ...prev, exercises: exercisesSnapshot.current }));
+            setEditingSheet(prev => prev ? { ...prev, exercises: exercisesSnapshot.current } : prev);
             exercisesSnapshot.current = null;
           }
           setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch('');
@@ -1358,48 +1381,60 @@ export default function WorkoutSheets() {
           padding: '16px 20px 12px 20px',
           borderBottom: '1px solid var(--border)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 36 }}>
-            {/* Title / Search input */}
-            {catalogSearchOpen ? (
-              <div style={{
-                flex: 1,
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                animation: 'catalogSearchExpand 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-              }}>
-                <Search size={15} strokeWidth={2.4} color="var(--text-tertiary)" style={{ position: 'absolute', left: 10, pointerEvents: 'none' }} />
-                <input
-                  ref={catalogSearchRef}
-                  type="text"
-                  placeholder="Search exercises..."
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                  className="catalog-search"
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px 8px 32px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--border)',
-                    background: 'var(--bg-card)',
-                    fontSize: 14,
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    fontFamily: 'inherit',
-                  }}
-                  onFocus={handleFocus}
-                />
-              </div>
-            ) : (
-              <h2 style={{
-                fontSize: 20,
-                fontWeight: 800,
-                margin: 0,
-                flex: 1,
-                color: 'var(--text-primary)',
-                letterSpacing: '-0.02em',
-              }}>Add Exercise</h2>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 36, position: 'relative' }}>
+            {/* Title — always in DOM, hidden when search is open */}
+            <h2 style={{
+              fontSize: 20,
+              fontWeight: 800,
+              margin: 0,
+              flex: catalogSearchOpen ? 0 : 1,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
+              opacity: catalogSearchOpen ? 0 : 1,
+              width: catalogSearchOpen ? 0 : 'auto',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              transition: 'opacity 0.2s ease, flex 0.2s ease',
+              pointerEvents: catalogSearchOpen ? 'none' : 'auto',
+            }}>Add Exercise</h2>
+
+            {/* Search input — always in DOM, expanded when search is open */}
+            <div style={{
+              flex: catalogSearchOpen ? 1 : 0,
+              width: catalogSearchOpen ? 'auto' : 0,
+              opacity: catalogSearchOpen ? 1 : 0,
+              overflow: 'hidden',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'opacity 0.2s ease, flex 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              borderRadius: 10,
+              border: '1.5px solid var(--border)',
+              background: 'var(--bg-card)',
+            }}>
+              <Search size={15} strokeWidth={2.4} color="var(--text-tertiary)" style={{ position: 'absolute', left: 10, pointerEvents: 'none', zIndex: 1 }} />
+              <input
+                ref={catalogSearchRef}
+                type="text"
+                placeholder="Search exercises..."
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                tabIndex={catalogSearchOpen ? 0 : -1}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px 8px 32px',
+                  borderRadius: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: 14,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit',
+                  color: 'inherit',
+                }}
+                onFocus={handleFocus}
+              />
+            </div>
 
             {/* Action buttons */}
             {catalogSearchOpen ? (
@@ -1426,10 +1461,13 @@ export default function WorkoutSheets() {
               <>
                 <button
                   onClick={() => {
+                    const scrollEl = document.querySelector('.modal-content');
+                    const savedScroll = scrollEl?.scrollTop || 0;
                     setCatalogSearchOpen(true);
                     setTimeout(() => {
                       catalogSearchRef.current?.focus({ preventScroll: true });
-                    }, 50);
+                      if (scrollEl) scrollEl.scrollTop = savedScroll;
+                    }, 60);
                   }}
                   style={{
                     background: 'none',
@@ -1451,7 +1489,7 @@ export default function WorkoutSheets() {
                 <button
                     onClick={() => {
                       if (exercisesSnapshot.current !== null) {
-                        setEditingSheet(prev => ({ ...prev, exercises: exercisesSnapshot.current }));
+                        setEditingSheet(prev => prev ? { ...prev, exercises: exercisesSnapshot.current } : prev);
                         exercisesSnapshot.current = null;
                       }
                       setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch('');
@@ -1518,21 +1556,13 @@ export default function WorkoutSheets() {
             }
 
             return (
-              <AnimatePresence mode="popLayout">
+              <>
                 {sorted.map((ex, i) => {
-                  const alreadyAdded = editingSheet?.exercises.some(e => e.exerciseId === ex.id);
+                  const alreadyAdded = editingSheet?.exercises?.some(e => e.exerciseId === ex.id);
                   return (
-                    <motion.button
+                    <button
                       key={ex.id}
-                      initial={{ opacity: 0, scale: 0.92, y: 14 }}
-                      whileInView={{ opacity: 1, scale: 1, y: 0 }}
-                      viewport={{ once: true, margin: '-20px' }}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 400,
-                        damping: 30,
-                        mass: 0.8,
-                      }}
+                      className="catalog-item-anim"
                       onClick={() => toggleExerciseInSheet(ex)}
                       style={{
                         display: 'flex',
@@ -1546,6 +1576,7 @@ export default function WorkoutSheets() {
                         cursor: 'pointer',
                         textAlign: 'left',
                         boxSizing: 'border-box',
+                        animationDelay: `${Math.min(i * 20, 300)}ms`,
                       }}
                     >
                       <div style={{
@@ -1571,46 +1602,39 @@ export default function WorkoutSheets() {
                           {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
                         </div>
                       </div>
-                    </motion.button>
+                    </button>
                   );
                 })}
-              </AnimatePresence>
+              </>
             );
           })()}
         </div>
       </Modal>
 
       {/* Floating Done button — portaled above the blur overlay */}
-      {createPortal(
-        <AnimatePresence>
-          {showCatalog && !catalogExpanded && editingSheet?.exercises.length > 0 && (
-            <motion.button
-              key="catalog-done"
-              initial={{ opacity: 0, scale: 0.5, x: '-50%' }}
-              animate={{ opacity: 1, scale: 1, x: '-50%' }}
-              exit={{ opacity: 0, scale: 0.5, x: '-50%' }}
-              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              onClick={() => { exercisesSnapshot.current = null; setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch(''); }}
-              style={{
-                position: 'fixed',
-                bottom: 'calc(85vh + 12px)',
-                left: '50%',
-                zIndex: 10001,
-                background: 'var(--text-primary)',
-                color: 'var(--bg-primary)',
-                border: 'none',
-                borderRadius: '100px',
-                padding: '10px 28px',
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-              }}
-            >
-              Done
-            </motion.button>
-          )}
-        </AnimatePresence>,
+      {showCatalog && !catalogExpanded && editingSheet?.exercises?.length > 0 && createPortal(
+        <button
+          className="catalog-done-btn"
+          onClick={() => { exercisesSnapshot.current = null; setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch(''); }}
+          style={{
+            position: 'fixed',
+            bottom: 'calc(85vh + 12px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10001,
+            background: 'var(--text-primary)',
+            color: 'var(--bg-primary)',
+            border: 'none',
+            borderRadius: '100px',
+            padding: '10px 28px',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+          }}
+        >
+          Done
+        </button>,
         document.body
       )}
 
