@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import {
   getWorkoutSheets, saveWorkoutSheet, deleteWorkoutSheet,
@@ -48,12 +49,12 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
       100% { opacity: 1; transform: translateY(0); max-height: 500px; }
     }
     @keyframes toastSlideIn {
-      from { transform: translateX(-50%) translateY(24px); opacity: 0; }
+      from { transform: translateX(-50%) translateY(-24px); opacity: 0; }
       to   { transform: translateX(-50%) translateY(0); opacity: 1; }
     }
     @keyframes toastSlideOut {
       from { transform: translateX(-50%) translateY(0); opacity: 1; }
-      to   { transform: translateX(-50%) translateY(24px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(-40px); opacity: 0; }
     }
     .sheet-btn {
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -128,21 +129,7 @@ const getTierColor = (exId) => {
   return 'var(--text-secondary)';
 };
 
-const defaultSheets = [
-  {
-    id: 1780143765896,
-    name: "CNS Strength Blueprint",
-    description: "Personalized compound routine maximizing myofibrillar density and neural drive (1-5 rep range) based on your stats (72.7kg, 5'10\"). Squeeze the bar with a white-knuckle grip to activate full-body tension (irradiation).",
-    isDefault: true,
-    exercises: [
-      { exerciseId: 'squat', minSets: 3, maxSets: 5, reps: 5, weight: 60, restMinutes: 4, amrap: false, notes: 'White-knuckle the bar and squeeze glutes. Rest 4m.' },
-      { exerciseId: 'bench', minSets: 3, maxSets: 5, reps: 5, weight: 50, restMinutes: 4, amrap: true, notes: 'Crush the bar, brace stomach. Last set AMRAP. Rest 4m.' },
-      { exerciseId: 'row', minSets: 3, maxSets: 5, reps: 5, weight: 45, restMinutes: 3, amrap: false, notes: 'Explode up, 2-sec slow eccentric control. Rest 3m.' },
-      { exerciseId: 'ohp', minSets: 3, maxSets: 5, reps: 5, weight: 35, restMinutes: 4, amrap: true, notes: 'Stand tall, squeeze glutes. Last set AMRAP. Rest 4m.' },
-      { exerciseId: 'deadlift', minSets: 1, maxSets: 3, reps: 5, weight: 70, restMinutes: 5, amrap: true, notes: 'Single high-effort work set. Pull with perfect form. Rest 5m.' },
-    ],
-  }
-];
+
 
 const WEEKDAYS = [
   { key: 'mon', label: 'Mon' },
@@ -162,8 +149,7 @@ export default function WorkoutSheets() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingSheet, setEditingSheet] = useState(null);
   const [showCatalog, setShowCatalog] = useState(false);
-  const [catalogCategory, setCatalogCategory] = useState('all');
-  const [catalogMuscle, setCatalogMuscle] = useState('all');
+
   const [catalogSearch, setCatalogSearch] = useState('');
   const [expandedSheet, setExpandedSheet] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
@@ -171,10 +157,27 @@ export default function WorkoutSheets() {
   const [dragIdx, setDragIdx] = useState(null);
   const [deletingSheetId, setDeletingSheetId] = useState(null);
   const [removingExIdx, setRemovingExIdx] = useState(null);
-  const [undoExercise, setUndoExercise] = useState(null); // { exercise, index, timer }
+  const [undoExercise, setUndoExercise] = useState(null);
+  const [justAddedId, setJustAddedId] = useState(null);
+  const [catalogSearchOpen, setCatalogSearchOpen] = useState(false);
+  const [catalogExpanded, setCatalogExpanded] = useState(false);
+  const catalogSearchRef = useRef(null);
+  const catalogExpandedRef = useRef(false);
+  const exercisesSnapshot = useRef(null);
   
   const handleFocus = useInputFocus();
   const { toast, show: showToast } = useToast();
+
+  const handleCatalogScroll = (e) => {
+    const st = e.currentTarget.scrollTop;
+    if (st > 2 && !catalogExpandedRef.current) {
+      catalogExpandedRef.current = true;
+      setCatalogExpanded(true);
+    } else if (st <= 1 && catalogExpandedRef.current) {
+      catalogExpandedRef.current = false;
+      setCatalogExpanded(false);
+    }
+  };
 
   useModalLock(showEditor || showCatalog || !!showDeleteConfirm || !!dayPickerDay);
 
@@ -183,11 +186,7 @@ export default function WorkoutSheets() {
   }, []);
 
   function loadData() {
-    let loaded = getWorkoutSheets();
-    if (loaded.length === 0) {
-      defaultSheets.forEach(s => saveWorkoutSheet({ ...s }));
-      loaded = getWorkoutSheets();
-    }
+    const loaded = getWorkoutSheets();
     setSheets(loaded);
     setSchedule(getRoutineSchedule());
   }
@@ -262,21 +261,32 @@ export default function WorkoutSheets() {
     showToast(editingSheet.id ? 'Sheet updated' : 'Sheet created', 'success');
   };
 
-  const addExerciseToSheet = (catalogExercise) => {
-    setEditingSheet(prev => ({
-      ...prev,
-      exercises: [...prev.exercises, {
-        exerciseId: catalogExercise.id,
-        minSets: 3,
-        maxSets: 5,
-        reps: 5,
-        weight: 0,
-        restMinutes: 3,
-        amrap: false,
-        notes: '',
-      }],
-    }));
-    showToast(`Added ${catalogExercise.name}`);
+  const toggleExerciseInSheet = (catalogExercise) => {
+    const alreadyAdded = editingSheet?.exercises.some(e => e.exerciseId === catalogExercise.id);
+    if (alreadyAdded) {
+      // Remove it
+      setEditingSheet(prev => ({
+        ...prev,
+        exercises: prev.exercises.filter(e => e.exerciseId !== catalogExercise.id),
+      }));
+      if (navigator.vibrate) navigator.vibrate(10);
+    } else {
+      // Add it
+      setEditingSheet(prev => ({
+        ...prev,
+        exercises: [...prev.exercises, {
+          exerciseId: catalogExercise.id,
+          minSets: 3,
+          maxSets: 5,
+          reps: 5,
+          weight: 0,
+          restMinutes: 3,
+          amrap: false,
+          notes: '',
+        }],
+      }));
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
   };
 
   const removeExerciseFromSheet = (index) => {
@@ -375,46 +385,7 @@ export default function WorkoutSheets() {
     return <Sparkles size={size} strokeWidth={2.4} color={color} />;
   };
 
-  const getAreaOrMuscleMatch = (ex, filter) => {
-    if (filter === 'all') return true;
-    const muscleGroup = (ex.muscleGroup || '').toLowerCase();
-    const muscle = (ex.muscle || '').toLowerCase();
-    const name = (ex.name || '').toLowerCase();
 
-    if (filter === 'upper') {
-      return ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'arms'].includes(muscleGroup) ||
-             muscle.includes('chest') || muscle.includes('back') || muscle.includes('shoulder') ||
-             muscle.includes('biceps') || muscle.includes('triceps') || muscle.includes('lats') ||
-             muscle.includes('arms') || muscle.includes('delt') || muscle.includes('rotator');
-    }
-    if (filter === 'lower') {
-      return ['legs', 'calves', 'quads', 'hamstrings'].includes(muscleGroup) ||
-             muscle.includes('legs') || muscle.includes('quads') || muscle.includes('hamstrings') ||
-             muscle.includes('glutes') || muscle.includes('calves') || muscle.includes('calf');
-    }
-    if (filter === 'chest') {
-      return muscleGroup === 'chest' || muscle.includes('chest') || name.includes('pushup') || name.includes('bench') || name.includes('dip');
-    }
-    if (filter === 'back') {
-      return muscleGroup === 'back' || muscle.includes('back') || muscle.includes('lats') || name.includes('pull') || name.includes('row');
-    }
-    if (filter === 'shoulders') {
-      return muscleGroup === 'shoulders' || muscle.includes('shoulder') || muscle.includes('delt') || (name.includes('press') && !name.includes('bench'));
-    }
-    if (filter === 'biceps') {
-      return muscleGroup === 'biceps' || muscle.includes('bicep') || name.includes('curl') || name.includes('chin-up');
-    }
-    if (filter === 'triceps') {
-      return muscleGroup === 'triceps' || muscle.includes('tricep') || name.includes('pushdown') || name.includes('skull') || name.includes('dip');
-    }
-    if (filter === 'legs') {
-      return muscleGroup === 'legs' || muscle.includes('legs') || muscle.includes('quad') || muscle.includes('hamstring') || muscle.includes('glute') || muscle.includes('calf') || muscle.includes('calves');
-    }
-    if (filter === 'core') {
-      return muscleGroup === 'core' || muscle.includes('core') || muscle.includes('abs') || muscle.includes('oblique') || name.includes('plank') || name.includes('twist') || name.includes('raise');
-    }
-    return false;
-  };
 
   const handleAssignRoutine = (dayKey, sheetId) => {
     const newSchedule = { ...schedule, [dayKey]: sheetId };
@@ -488,8 +459,9 @@ export default function WorkoutSheets() {
             alignItems: 'center',
             gap: 8,
           }}>
-            <Star size={24} strokeWidth={1.5} color="var(--border-light)" />
-            <span>No plans created. Create a new plan using the button below.</span>
+            <Dumbbell size={28} strokeWidth={1.5} color="var(--text-tertiary)" />
+            <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>No routines yet</span>
+            <span>Create your first routine to start the commitment to being better.</span>
           </div>
         )}
         {sheets.map(sheet => {
@@ -758,9 +730,69 @@ export default function WorkoutSheets() {
         <Modal
           isOpen={showEditor}
           onClose={() => { setShowEditor(false); setEditingSheet(null); }}
-          title={editingSheet.id ? 'Edit Sheet' : 'New Workout Sheet'}
           type="bottom-sheet"
+          hideHeader
         >
+          {/* Custom header */}
+          <div style={{
+            position: 'sticky',
+            top: -24,
+            background: 'var(--bg-secondary)',
+            zIndex: 101,
+            margin: '-24px -20px 16px -20px',
+            padding: '16px 20px 12px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <h2 style={{
+              fontSize: 20,
+              fontWeight: 800,
+              margin: 0,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
+              flex: 1,
+            }}>{editingSheet.id ? 'Edit Sheet' : 'New Sheet'}</h2>
+            {editingSheet.exercises.length > 0 ? (
+              <button
+                onClick={handleSaveSheet}
+                disabled={!editingSheet.name.trim()}
+                className="catalog-chip"
+                style={{
+                  background: editingSheet.name.trim() ? 'var(--text-primary)' : 'var(--bg-secondary)',
+                  color: editingSheet.name.trim() ? 'var(--bg-primary)' : 'var(--text-tertiary)',
+                  border: editingSheet.name.trim() ? 'none' : '1.5px solid var(--border)',
+                  borderRadius: '100px',
+                  padding: '7px 20px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: editingSheet.name.trim() ? 'pointer' : 'default',
+                }}
+              >
+                Save
+              </button>
+            ) : (
+              <button
+                onClick={() => { setShowEditor(false); setEditingSheet(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-tertiary)',
+                  padding: 8,
+                  margin: -8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 36,
+                  minHeight: 36,
+                }}
+                aria-label="Close modal"
+              >
+                <X size={20} strokeWidth={2.2} />
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 16 }}>
             {/* Sheet Info Card */}
             <div style={{
@@ -902,11 +934,14 @@ export default function WorkoutSheets() {
               </div>
 
               {editingSheet.exercises.length === 0 && (
-                <div style={{ padding: '24px 16px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '16px', border: '2px dashed var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                <button
+                  onClick={() => { exercisesSnapshot.current = [...(editingSheet?.exercises || [])]; setShowCatalog(true); }}
+                  style={{ padding: '28px 16px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '16px', border: '2px dashed var(--border)', boxShadow: 'var(--shadow-sm)', width: '100%', cursor: 'pointer' }}
+                >
                   <Dumbbell size={28} strokeWidth={2.2} color="var(--text-tertiary)" style={{ marginBottom: 8 }} />
                   <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>No exercises added yet</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Tap "Add Exercise" below</div>
-                </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Tap here to add exercises</div>
+                </button>
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1224,57 +1259,32 @@ export default function WorkoutSheets() {
                 })}
               </div>
 
-              {/* Add Exercise Button */}
-              <button
-                type="button"
-                className="sheet-btn"
-                style={{ 
-                  marginTop: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  width: '100%',
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-primary)',
-                  border: '2px solid var(--border)',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: 'var(--shadow-sm)',
-                }}
-                onClick={() => setShowCatalog(true)}
-              >
-                <Plus size={14} strokeWidth={2.4} /> Add Exercise
-              </button>
+              {/* Add more row — only show when exercises exist */}
+              {editingSheet.exercises.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { exercisesSnapshot.current = [...(editingSheet?.exercises || [])]; setShowCatalog(true); }}
+                  style={{
+                    marginTop: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    width: '100%',
+                    background: 'none',
+                    color: 'var(--text-tertiary)',
+                    border: '1.5px dashed var(--border)',
+                    borderRadius: '12px',
+                    padding: '10px 16px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Plus size={14} strokeWidth={2.4} /> Add more
+                </button>
+              )}
             </div>
-
-            {/* Save Button */}
-            <button
-              className="sheet-btn"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                width: '100%',
-                background: editingSheet.name.trim() ? 'var(--text-primary)' : 'var(--bg-secondary)',
-                color: editingSheet.name.trim() ? 'var(--bg-primary)' : 'var(--text-tertiary)',
-                border: '2px solid var(--border)',
-                borderRadius: '14px',
-                padding: '14px 20px',
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: editingSheet.name.trim() ? 'pointer' : 'default',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-              onClick={handleSaveSheet}
-              disabled={!editingSheet.name.trim()}
-            >
-              <Check size={16} strokeWidth={2.4} /> {editingSheet.id ? 'Save Changes' : 'Create Sheet'}
-            </button>
           </div>
 
           {/* Undo Toast */}
@@ -1326,139 +1336,145 @@ export default function WorkoutSheets() {
       {/* ===== EXERCISE CATALOG MODAL ===== */}
       <Modal
         isOpen={showCatalog}
-        onClose={() => setShowCatalog(false)}
-        title="Add Exercise"
+        onClose={() => {
+          if (exercisesSnapshot.current !== null) {
+            setEditingSheet(prev => ({ ...prev, exercises: exercisesSnapshot.current }));
+            exercisesSnapshot.current = null;
+          }
+          setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch('');
+        }}
         type="bottom-sheet"
+        fullscreen={catalogExpanded}
+        onContentScroll={handleCatalogScroll}
+        hideHeader
       >
+        {/* Unified header */}
         <div style={{
-          position: 'relative',
+          position: 'sticky',
+          top: -24,
           background: 'var(--bg-secondary)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-          paddingTop: 12,
-          paddingBottom: 12,
-          borderBottom: '2px solid var(--border)',
-          margin: '0 -20px 12px -20px',
-          paddingLeft: 20,
-          paddingRight: 20,
+          zIndex: 101,
+          margin: '-24px -20px 12px -20px',
+          padding: '16px 20px 12px 20px',
+          borderBottom: '1px solid var(--border)',
         }}>
-          {/* Search bar */}
-          <div style={{ position: 'relative' }}>
-            <Search size={16} strokeWidth={2.4} color="var(--text-tertiary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Search exercises..."
-              value={catalogSearch}
-              onChange={(e) => setCatalogSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 12px 10px 36px',
-                borderRadius: '10px',
-                border: '2px solid var(--border)',
-                background: 'var(--bg-card)',
-                fontSize: 14,
-                outline: 'none',
-                boxSizing: 'border-box',
-                fontFamily: 'inherit',
-                transition: 'all 0.2s',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-              onFocus={handleFocus}
-            />
-            {catalogSearch && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 36 }}>
+            {/* Title / Search input */}
+            {catalogSearchOpen ? (
+              <div style={{
+                flex: 1,
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                animation: 'catalogSearchExpand 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              }}>
+                <Search size={15} strokeWidth={2.4} color="var(--text-tertiary)" style={{ position: 'absolute', left: 10, pointerEvents: 'none' }} />
+                <input
+                  ref={catalogSearchRef}
+                  type="text"
+                  placeholder="Search exercises..."
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  className="catalog-search"
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px 8px 32px',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--bg-card)',
+                    fontSize: 14,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                  }}
+                  onFocus={handleFocus}
+                />
+              </div>
+            ) : (
+              <h2 style={{
+                fontSize: 20,
+                fontWeight: 800,
+                margin: 0,
+                flex: 1,
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.02em',
+              }}>Add Exercise</h2>
+            )}
+
+            {/* Action buttons */}
+            {catalogSearchOpen ? (
               <button
-                onClick={() => setCatalogSearch('')}
+                onClick={() => { setCatalogSearchOpen(false); setCatalogSearch(''); }}
                 style={{
-                  position: 'absolute',
-                  right: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-tertiary)',
-                  padding: 0,
                   cursor: 'pointer',
+                  color: 'var(--text-tertiary)',
+                  padding: 8,
+                  margin: -8,
                   display: 'flex',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 36,
+                  minHeight: 36,
                 }}
+                aria-label="Close search"
               >
-                <X size={16} strokeWidth={2.4} />
+                <X size={20} strokeWidth={2.2} />
               </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setCatalogSearchOpen(true);
+                    setTimeout(() => {
+                      catalogSearchRef.current?.focus({ preventScroll: true });
+                    }, 50);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-tertiary)',
+                    padding: 8,
+                    margin: -8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 36,
+                    minHeight: 36,
+                  }}
+                  aria-label="Search exercises"
+                >
+                  <Search size={20} strokeWidth={2.2} />
+                </button>
+                <button
+                    onClick={() => {
+                      if (exercisesSnapshot.current !== null) {
+                        setEditingSheet(prev => ({ ...prev, exercises: exercisesSnapshot.current }));
+                        exercisesSnapshot.current = null;
+                      }
+                      setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch('');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-tertiary)',
+                      padding: 8,
+                      margin: -8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: 36,
+                      minHeight: 36,
+                    }}
+                    aria-label="Close modal"
+                  >
+                    <X size={20} strokeWidth={2.2} />
+                  </button>
+              </>
             )}
-          </div>
-
-          {/* Primary Category selector */}
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'strength', label: 'Strength' },
-              { id: 'calisthenics', label: 'Calisthenics' },
-              { id: 'cardio', label: 'Cardio' },
-              { id: 'mobility', label: 'Mobility' }
-            ].map(c => {
-              const isAct = catalogCategory === c.id;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setCatalogCategory(c.id)}
-                  className="sheet-chip"
-                  style={{
-                    flexShrink: 0,
-                    background: isAct ? 'var(--text-primary)' : 'var(--bg-card)',
-                    color: isAct ? 'var(--bg-primary)' : 'var(--text-primary)',
-                    border: '2px solid var(--border)',
-                    borderRadius: '100px',
-                    padding: '6px 14px',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: 'var(--shadow-sm)',
-                  }}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Secondary Muscle selector */}
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-            {[
-              { id: 'all', label: 'All Areas' },
-              { id: 'upper', label: 'Upper Body' },
-              { id: 'lower', label: 'Lower Body' },
-              { id: 'chest', label: 'Chest' },
-              { id: 'back', label: 'Back' },
-              { id: 'shoulders', label: 'Shoulder' },
-              { id: 'biceps', label: 'Biceps' },
-              { id: 'triceps', label: 'Triceps' },
-              { id: 'legs', label: 'Legs' },
-              { id: 'core', label: 'Core' }
-            ].map(m => {
-              const isAct = catalogMuscle === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => setCatalogMuscle(m.id)}
-                  className="sheet-chip"
-                  style={{
-                    flexShrink: 0,
-                    background: isAct ? 'var(--text-primary)' : 'var(--bg-card)',
-                    color: isAct ? 'var(--bg-primary)' : 'var(--text-primary)',
-                    border: '2px solid var(--border)',
-                    borderRadius: '100px',
-                    padding: '5px 12px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: 'var(--shadow-sm)',
-                  }}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
           </div>
         </div>
 
@@ -1466,39 +1482,23 @@ export default function WorkoutSheets() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {(() => {
             const filtered = exerciseCatalog.filter(e => {
-              const matchesSearch = !catalogSearch.trim() || 
-                e.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
-                e.muscle.toLowerCase().includes(catalogSearch.toLowerCase());
-              const matchesCategory = catalogCategory === 'all' || e.category === catalogCategory;
-              const matchesMuscle = getAreaOrMuscleMatch(e, catalogMuscle);
-              return matchesSearch && matchesCategory && matchesMuscle;
+              if (!catalogSearch.trim()) return true;
+              const q = catalogSearch.toLowerCase();
+              return e.name.toLowerCase().includes(q) || 
+                e.muscle.toLowerCase().includes(q) ||
+                e.category.toLowerCase().includes(q);
             });
+            const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 
-            const categoryGroups = [
-              { id: 'strength', name: 'Strength Training', icon: <Dumbbell size={14} strokeWidth={2.4} /> },
-              { id: 'calisthenics', name: 'Calisthenics & Bodyweight', icon: <Zap size={14} strokeWidth={2.4} /> },
-              { id: 'cardio', name: 'Cardio & Conditioning', icon: <Play size={14} strokeWidth={2.4} /> },
-              { id: 'mobility', name: 'Mobility & Warm-up', icon: <RotateCcw size={14} strokeWidth={2.4} /> }
-            ];
-
-            const grouped = categoryGroups.map(group => {
-              const items = filtered.filter(e => e.category === group.id);
-              return { ...group, items };
-            }).filter(group => group.items.length > 0);
-
-            if (grouped.length === 0) {
+            if (sorted.length === 0) {
               return (
                 <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-tertiary)' }}>
                   <AlertTriangle size={32} strokeWidth={2} style={{ marginBottom: 10, color: 'var(--text-tertiary)' }} />
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>No Exercises Found</div>
-                  <div style={{ fontSize: 12, marginBottom: 14 }}>Try adjusting your search terms or filters.</div>
+                  <div style={{ fontSize: 12, marginBottom: 14 }}>Try adjusting your search terms.</div>
                   <button
                     className="sheet-btn"
-                    onClick={() => {
-                      setCatalogSearch('');
-                      setCatalogCategory('all');
-                      setCatalogMuscle('all');
-                    }}
+                    onClick={() => setCatalogSearch('')}
                     style={{
                       background: 'var(--bg-card)',
                       color: 'var(--text-primary)',
@@ -1511,109 +1511,108 @@ export default function WorkoutSheets() {
                       boxShadow: 'var(--shadow-sm)',
                     }}
                   >
-                    Reset Filters
+                    Clear Search
                   </button>
                 </div>
               );
             }
 
-            return grouped.map(group => (
-              <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {/* Category Header */}
-                <div style={{
-                  position: 'sticky',
-                  top: 40,
-                  background: 'var(--bg-secondary)',
-                  zIndex: 5,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: 'var(--text-tertiary)',
-                  padding: '12px 20px 6px 20px',
-                  borderBottom: '2px solid var(--border)',
-                  margin: '0 -20px 8px -20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}>
-                  <span style={{ display: 'flex' }}>{group.icon}</span>
-                  <span>{group.name}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)' }}>({group.items.length})</span>
-                </div>
-
-                {/* Items */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {group.items.map(ex => {
-                    const addedCount = editingSheet?.exercises.filter(e => e.exerciseId === ex.id).length || 0;
-                    const alreadyAdded = addedCount > 0;
-                    return (
-                      <button
-                        key={ex.id}
-                        onClick={() => addExerciseToSheet(ex)}
-                        className="sheet-btn"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          width: '100%',
-                          padding: '12px 14px',
-                          background: alreadyAdded ? 'var(--bg-secondary)' : 'var(--bg-card)',
-                          borderRadius: '14px',
-                          border: '2px solid var(--border)',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          boxSizing: 'border-box',
-                          boxShadow: 'var(--shadow-sm)',
-                        }}
-                      >
-                        <div style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '8px',
-                          background: 'var(--bg-card)',
-                          border: '2px solid var(--border)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                          {renderExerciseIcon(ex.type, 16)}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{ex.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, fontWeight: 600 }}>
-                            {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
-                          </div>
-                        </div>
+            return (
+              <AnimatePresence mode="popLayout">
+                {sorted.map((ex, i) => {
+                  const alreadyAdded = editingSheet?.exercises.some(e => e.exerciseId === ex.id);
+                  return (
+                    <motion.button
+                      key={ex.id}
+                      initial={{ opacity: 0, scale: 0.92, y: 14 }}
+                      whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                      viewport={{ once: true, margin: '-20px' }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 400,
+                        damping: 30,
+                        mass: 0.8,
+                      }}
+                      onClick={() => toggleExerciseInSheet(ex)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        width: '100%',
+                        padding: '12px 14px',
+                        background: alreadyAdded ? '#f0fdf4' : 'var(--bg-card)',
+                        borderRadius: '14px',
+                        border: alreadyAdded ? '1.5px solid #86efac' : '1.5px solid var(--border)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <div style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: alreadyAdded ? '50%' : '10px',
+                        background: alreadyAdded ? '#22c55e' : 'var(--bg-secondary)',
+                        border: alreadyAdded ? '1.5px solid #16a34a' : '1.5px solid var(--border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                      }}>
                         {alreadyAdded ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ 
-                              fontSize: 9, 
-                              fontWeight: 700, 
-                              background: 'var(--bg-primary)', 
-                              color: 'var(--text-primary)',
-                              border: '2px solid var(--border)',
-                              padding: '2px 6px', 
-                              borderRadius: '100px', 
-                              letterSpacing: '0.03em',
-                              animation: 'sheetsAddPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
-                            }}>
-                              {addedCount}× Added
-                            </span>
-                            <Plus size={16} strokeWidth={2.4} color="var(--text-primary)" />
-                          </div>
+                          <Check size={16} strokeWidth={3} color="#FFFFFF" />
                         ) : (
-                          <Plus size={16} strokeWidth={2.4} color="var(--text-primary)" />
+                          renderExerciseIcon(ex.type, 16)
                         )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ));
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: alreadyAdded ? '#15803d' : 'var(--text-primary)' }}>{ex.name}</div>
+                        <div style={{ fontSize: 11, color: alreadyAdded ? '#4ade80' : 'var(--text-tertiary)', marginTop: 2, fontWeight: 600 }}>
+                          {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
+                        </div>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </AnimatePresence>
+            );
           })()}
         </div>
       </Modal>
+
+      {/* Floating Done button — portaled above the blur overlay */}
+      {createPortal(
+        <AnimatePresence>
+          {showCatalog && !catalogExpanded && editingSheet?.exercises.length > 0 && (
+            <motion.button
+              key="catalog-done"
+              initial={{ opacity: 0, scale: 0.5, x: '-50%' }}
+              animate={{ opacity: 1, scale: 1, x: '-50%' }}
+              exit={{ opacity: 0, scale: 0.5, x: '-50%' }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              onClick={() => { exercisesSnapshot.current = null; setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch(''); }}
+              style={{
+                position: 'fixed',
+                bottom: 'calc(85vh + 12px)',
+                left: '50%',
+                zIndex: 10001,
+                background: 'var(--text-primary)',
+                color: 'var(--bg-primary)',
+                border: 'none',
+                borderRadius: '100px',
+                padding: '10px 28px',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              }}
+            >
+              Done
+            </motion.button>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* ===== DELETE CONFIRMATION ===== */}
       <Modal
@@ -1688,7 +1687,7 @@ export default function WorkoutSheets() {
       {toast && createPortal(
         <div style={{
           position: 'fixed', 
-          bottom: 100, 
+          top: 'max(16px, env(safe-area-inset-top, 16px))', 
           left: '50%',
           display: 'flex', 
           justifyContent: 'center', 

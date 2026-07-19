@@ -231,44 +231,7 @@ const ROUTINE_SCHEDULE_KEY = 'fitforge_routine_schedule';
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 export function getWorkoutSheets() {
-  let sheets = getItem(SHEETS_KEY) || [];
-  
-  const hasCNSBlueprint = sheets.some(s => s.name === "CNS Strength Blueprint");
-  if (!hasCNSBlueprint) {
-    const today = getToday();
-    
-    const cnsSheet = {
-      id: 1780143765896,
-      name: "CNS Strength Blueprint",
-      description: "Personalized compound routine maximizing myofibrillar density and neural drive (1-5 rep range).",
-      isDefault: true,
-      createdAt: today,
-      exercises: [
-        { exerciseId: 'squat', minSets: 3, maxSets: 5, reps: 5, weight: 60, restMinutes: 4, amrap: false, notes: 'White-knuckle the bar and squeeze glutes. Rest 4m.' },
-        { exerciseId: 'bench', minSets: 3, maxSets: 5, reps: 5, weight: 50, restMinutes: 4, amrap: true, notes: 'Crush the bar, brace stomach. Last set AMRAP. Rest 4m.' },
-        { exerciseId: 'row', minSets: 3, maxSets: 5, reps: 5, weight: 45, restMinutes: 3, amrap: false, notes: 'Explode up, 2-sec slow eccentric control. Rest 3m.' },
-        { exerciseId: 'ohp', minSets: 3, maxSets: 5, reps: 5, weight: 35, restMinutes: 4, amrap: true, notes: 'Stand tall, squeeze glutes. Last set AMRAP. Rest 4m.' },
-        { exerciseId: 'deadlift', minSets: 1, maxSets: 3, reps: 5, weight: 70, restMinutes: 5, amrap: true, notes: 'Single high-effort work set. Pull with perfect form. Rest 5m.' },
-      ]
-    };
-    
-    sheets = sheets.filter(s => !s.isDefault);
-    sheets.push(cnsSheet);
-    localStorage.setItem(SHEETS_KEY, JSON.stringify(sheets));
-    
-    // Auto-assign default to Mon/Wed/Fri
-    const schedule = getRoutineSchedule();
-    if (!schedule.mon && !schedule.tue && !schedule.wed && !schedule.thu && !schedule.fri) {
-      saveRoutineSchedule({
-        ...schedule,
-        mon: cnsSheet.id,
-        wed: cnsSheet.id,
-        fri: cnsSheet.id,
-      });
-    }
-  }
-  
-  return sheets;
+  return getItem(SHEETS_KEY) || [];
 }
 
 export function saveWorkoutSheet(sheet) {

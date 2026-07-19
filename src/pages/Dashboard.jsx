@@ -7,7 +7,8 @@ import {
   ChevronLeft, 
   Dumbbell, 
   Coffee,
-  Check
+  Check,
+  Moon
 } from 'lucide-react';
 import { 
   getToday, 
@@ -15,8 +16,11 @@ import {
   getSettings, 
   getWorkoutLogs, 
   getTodayRoutine,
-  isDeloadDate
+  isDeloadDate,
+  getRoutineSchedule
 } from '../utils/storage';
+import { exercises as defaultExercises } from '../data/workouts';
+import Modal from '../components/Modal';
 import logo from '../assets/fitforge_logo.png';
 
 function getGreeting() {
@@ -39,7 +43,11 @@ function formatDate(dateStr) {
 // --- Gym Attendance Tracker ---
 function GymAttendanceTracker() {
   const [monthOffset, setMonthOffset] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(null);
   const workoutLogs = getWorkoutLogs();
+  const schedule = getRoutineSchedule();
+
+  const getExName = (id) => defaultExercises[id]?.name || id;
 
   const now = new Date();
   const viewDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
@@ -48,6 +56,8 @@ function GymAttendanceTracker() {
   
   const todayStr = getToday();
   const isCurrentMonth = monthOffset === 0;
+
+  const weekdayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
   // Build set of workout dates for this month
   const gymDates = new Set();
@@ -58,8 +68,6 @@ function GymAttendanceTracker() {
       gymDates.add(log.date);
     }
   });
-
-
 
   // Build calendar grid
   const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
@@ -75,7 +83,9 @@ function GymAttendanceTracker() {
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    cells.push({ day: d, date: dateStr, isGym: gymDates.has(dateStr), isToday: dateStr === todayStr });
+    const dayOfWeek = new Date(year, month, d).getDay();
+    const isScheduledRestDay = !schedule[weekdayKeys[dayOfWeek]];
+    cells.push({ day: d, date: dateStr, isGym: gymDates.has(dateStr), isToday: dateStr === todayStr, isRestDay: isScheduledRestDay });
   }
 
   const totalSessions = gymDates.size;
@@ -127,26 +137,37 @@ function GymAttendanceTracker() {
           }
 
           const isFuture = cell.date > todayStr;
+          const isPast = cell.date < todayStr;
           const isDeload = isDeloadDate(cell.date);
 
           return (
             <div
               key={cell.date}
+              onClick={() => !isFuture && setSelectedDate(cell.date)}
               style={{
                 ...attendanceStyles.dayCell,
-                background: cell.isGym ? '#222222' : 'transparent',
+                flexDirection: 'column',
+                gap: 1,
+                cursor: isFuture ? 'default' : 'pointer',
+                background: cell.isGym ? '#222222' : (isPast && cell.isRestDay ? 'var(--bg-secondary)' : 'transparent'),
                 border: cell.isToday
                   ? `2px solid #222222`
-                  : (isDeload && !cell.isGym ? '2px dashed #CCCCCC' : '2px solid transparent'),
+                  : (isPast && cell.isRestDay ? '2px solid var(--border)' : (isDeload && !cell.isGym ? '2px dashed #CCCCCC' : '2px solid transparent')),
                 opacity: isFuture ? 0.25 : 1,
                 boxShadow: cell.isGym ? 'var(--shadow-sm)' : 'none',
                 position: 'relative'
               }}
             >
+              {isPast && cell.isGym && (
+                <Dumbbell size={11} strokeWidth={2.5} color="#FFFFFF" style={{ marginBottom: -1 }} />
+              )}
+              {isPast && !cell.isGym && cell.isRestDay && (
+                <Moon size={10} strokeWidth={2.2} color="var(--text-tertiary)" style={{ marginBottom: -1 }} />
+              )}
               <span style={{
-                fontSize: 12,
+                fontSize: (isPast && (cell.isGym || cell.isRestDay)) ? 9 : 12,
                 fontWeight: cell.isGym || cell.isToday ? '800' : '600',
-                color: cell.isGym ? '#FFFFFF' : (cell.isToday ? 'var(--text-primary)' : (isDeload && !cell.isGym ? '#999999' : 'var(--text-secondary)')),
+                color: cell.isGym ? '#FFFFFF' : (cell.isToday ? 'var(--text-primary)' : (isPast && cell.isRestDay ? 'var(--text-tertiary)' : (isDeload && !cell.isGym ? '#999999' : 'var(--text-secondary)'))),
                 lineHeight: 1,
               }}>
                 {cell.day}
@@ -158,6 +179,94 @@ function GymAttendanceTracker() {
           );
         })}
       </div>
+
+      {/* Workout Detail Modal */}
+      <Modal
+        isOpen={!!selectedDate}
+        onClose={() => setSelectedDate(null)}
+        title={selectedDate ? formatDate(selectedDate) : ''}
+        type="bottom-sheet"
+      >
+        {(() => {
+          if (!selectedDate) return null;
+          const dayLogs = getWorkoutsByDate(selectedDate);
+          
+          if (dayLogs.length === 0) {
+            const [sy, sm, sd] = selectedDate.split('-').map(Number);
+            const dow = new Date(sy, sm - 1, sd).getDay();
+            const isRest = !schedule[weekdayKeys[dow]];
+            return (
+              <div style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-tertiary)' }}>
+                {isRest ? (
+                  <>
+                    <Moon size={28} strokeWidth={1.5} color="var(--text-tertiary)" style={{ marginBottom: 8 }} />
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Rest Day</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>No workout scheduled</div>
+                  </>
+                ) : (
+                  <>
+                    <Dumbbell size={28} strokeWidth={1.5} color="var(--text-tertiary)" style={{ marginBottom: 8 }} />
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>No Workout Logged</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>A workout was scheduled but not completed</div>
+                  </>
+                )}
+              </div>
+            );
+          }
+
+          // Group all sets by exercise
+          // Group sets by exercise — only keep the latest log per exercise
+          const exerciseSets = {};
+          dayLogs.forEach(log => {
+            (log.sets || []).forEach(s => {
+              // Later logs overwrite earlier ones for the same exercise
+              exerciseSets[s.exerciseId] = { sets: [], logId: log.id };
+            });
+          });
+          // Second pass: collect sets from the latest log per exercise
+          dayLogs.forEach(log => {
+            (log.sets || []).forEach(s => {
+              if (exerciseSets[s.exerciseId]?.logId === log.id) {
+                exerciseSets[s.exerciseId].sets.push(s);
+              }
+            });
+          });
+          const templateName = dayLogs[0]?.templateName;
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 8 }}>
+              {templateName && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <Dumbbell size={16} strokeWidth={2.4} color="var(--text-primary)" />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{templateName}</span>
+                </div>
+              )}
+              {Object.entries(exerciseSets).map(([exId, { sets }]) => (
+                <div key={exId} style={{
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 14,
+                  border: '2px solid var(--border)',
+                  padding: '12px 14px',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+                    {getExName(exId)}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {sets.map((s, si) => (
+                      <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text-tertiary)', minWidth: 20 }}>#{si + 1}</span>
+                        <span>{s.weight > 0 ? `${s.weight} kg` : 'BW'}</span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>×</span>
+                        <span>{s.reps} reps</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </Modal>
 
     </section>
   );
@@ -314,12 +423,15 @@ export default function Dashboard() {
     <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)' }}>
       {/* ───── Header Top Bar ───── */}
       <div style={styles.headerTopBar}>
-        <div style={styles.logoContainer}>
-          <img
-            src={logo}
-            alt="FitForge"
-            style={styles.logoImage}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={styles.logoContainer}>
+            <img
+              src={logo}
+              alt="FitForge"
+              style={styles.logoImage}
+            />
+          </div>
+          <p style={styles.dateLarge}>{formatDate(today)}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
@@ -344,12 +456,9 @@ export default function Dashboard() {
 
       {/* ───── Hero Greeting Section ───── */}
       <header style={styles.heroGreetingBlock}>
-        <div>
-          <h1 style={styles.greetingLarge}>
-            {getGreeting()}, <span style={styles.warrior}>{settings.name || 'Warrior'}</span>
-          </h1>
-          <p style={styles.dateLarge}>{formatDate(today)}</p>
-        </div>
+        <h1 style={styles.greetingLarge}>
+          {getGreeting()}, <span style={styles.warrior}>{settings.name || 'Warrior'}</span>
+        </h1>
       </header>
 
       {/* ───── Today's Workout Pill ───── */}

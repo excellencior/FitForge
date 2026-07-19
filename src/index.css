@@ -595,6 +595,7 @@ input[type="number"]::-webkit-outer-spin-button {
   position: relative;
 }
 
+
 .modal-content::-webkit-scrollbar {
   width: 0;
   display: none;
@@ -941,5 +942,60 @@ input:focus, select:focus, textarea:focus {
   0% { transform: scale(0.9) translateY(20px); opacity: 0; }
   100% { transform: scale(1) translateY(0); opacity: 1; }
 }
+
+/* ===== EXERCISE CATALOG UPGRADES ===== */
+.catalog-chip {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  will-change: transform, background-color, color;
+}
+
+.catalog-chip:active {
+  transform: scale(0.93) !important;
+}
+
+.catalog-chip-active {
+  transform: scale(1.03);
+}
+
+.catalog-item {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform, background-color, border-color;
+}
+
+.catalog-item:active {
+  transform: scale(0.97) !important;
+}
+
+@keyframes catalogAddPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.catalog-item-added {
+  animation: catalogAddPulse 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.catalog-search:focus {
+  border-color: var(--text-primary) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+@keyframes catalogSearchExpand {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scaleX(0.6);
+    transform-origin: right center;
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+    transform-origin: right center;
+  }
+}
+
 
 
