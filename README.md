@@ -34,7 +34,7 @@ To test FitForge directly on your Android device:
   3. *Accessory Compounds* (Dips, Leg Press)
   4. *Isolation* (Bicep Curls, Lateral Raises)
   5. *Core* (Planks)
-  6. *Conditioning* (Kettlebell Swings, Farmer's Walks)
+- **67+ Exercise Library:** Comprehensive database covering compound lifts, isolation movements, calisthenics, mobility drills, and conditioning — fully covering both Apurbo's 5-day split and wife's 3-day beginner program.
 - **Interactive Sheet Editor:** Customize sheet names, descriptions, start/end dates, sets, reps, weight (in kg), rest times, and toggles for AMRAP (As Many Reps As Possible).
 - **Drag-and-Drop Order Optimization:** Reorder exercises using simple drag-and-drop or leverage the intelligent auto-ordering tool to automatically sort movements in scientific sequence (heaviest compounds first).
 - **Activation Lock:** Enforces discipline by limiting active sheet changes to once per calendar day.
@@ -50,7 +50,12 @@ To test FitForge directly on your Android device:
 - **Trophy Cabinet (PRs):** Showcases your all-time heaviest compound personal records alongside estimated 1RM calculations.
 - **Monthly Journey Archives:** At the end of each month, the app compiles a comprehensive card detailing total workouts done, estimated calorie burn, most repeated exercise, net weight/BMI changes, and your top 3 most frequently logged meals.
 
-### 5. Milestone Streak Celebrations
+### 5. Daily Notes
+- **Day-of-Week Tabs:** Dedicated notes page with Mon–Sun tabs for jotting down quick reminders, workout observations, or meal plans per day.
+- **Full-Screen Editor:** Borderless, auto-expanding textarea that fills the screen for distraction-free writing.
+- **Auto-Save:** Notes are debounce-saved to local storage — no save button needed.
+
+### 6. Milestone Streak Celebrations
 - Gamifies consistency with beautifully-designed full-screen milestone badges and unique motivational alerts for hitting streak thresholds (10, 20, 30, 50, 100+ days).
 
 ---
