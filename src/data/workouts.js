@@ -1230,6 +1230,40 @@ export const exercises = {
     startWeight: 2,
     increment: 1,
   },
+  scapularPullup: {
+    id: 'scapularPullup',
+    name: 'Scapular Pull-up',
+    nameShort: 'Scapular Pull-up',
+    muscle: 'Lower Traps, Lats, Scapular Stabilizers',
+    category: 'calisthenics',
+    muscleGroup: 'back',
+    type: 'accessory',
+    formTips: [
+      'Hang from bar with straight arms',
+      'Without bending elbows, squeeze shoulder blades down and together',
+      'Hold the retracted position for 1 second, then release',
+    ],
+    warnings: [],
+    startWeight: 0,
+    increment: 0,
+  },
+  bandAssistedPullup: {
+    id: 'bandAssistedPullup',
+    name: 'Band-Assisted Pull-up',
+    nameShort: 'Band Pull-up',
+    muscle: 'Lats, Biceps, Core, Grip',
+    category: 'calisthenics',
+    muscleGroup: 'back',
+    type: 'compound',
+    formTips: [
+      'Loop resistance band over bar and place knee or foot in loop',
+      'Pull chin over bar with full range of motion',
+      'Progress from thick band to thin band as you get stronger',
+    ],
+    warnings: [],
+    startWeight: 0,
+    increment: 0,
+  },
 };
 
 // Personalized CNS Strength Blueprint template

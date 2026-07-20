@@ -242,15 +242,7 @@ export default function WorkoutSheets() {
     }, 280);
   };
 
-  const handleSetDefault = (sheet) => {
-    const all = getWorkoutSheets();
-    all.forEach(s => {
-      if (s.isDefault) saveWorkoutSheet({ ...s, isDefault: false });
-    });
-    saveWorkoutSheet({ ...sheet, isDefault: true });
-    loadData();
-    showToast(`${sheet.name} set as default`, 'success');
-  };
+
 
   const openNewSheet = () => {
     setEditingSheet({
@@ -513,7 +505,7 @@ export default function WorkoutSheets() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{sheet.name}</span>
-                      {sheet.isDefault && <Star size={12} fill="#333" color="#333" />}
+                      {schedule[todayKey] === sheet.id && <Star size={12} fill="#333" color="#333" />}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
                       {sheet.exercises?.length || 0} exercises
@@ -603,27 +595,6 @@ export default function WorkoutSheets() {
 
                   {/* Action Buttons */}
                   <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-                    {!sheet.isDefault && (
-                      <button 
-                        className="sheet-btn"
-                        style={{
-                          width: 38,
-                          height: 38,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'var(--bg-card)',
-                          border: '2px solid var(--border)',
-                          borderRadius: '12px',
-                          boxShadow: 'var(--shadow-sm)',
-                          cursor: 'pointer',
-                        }} 
-                        onClick={() => handleSetDefault(sheet)} 
-                        title="Set as default"
-                      >
-                        <Star size={14} strokeWidth={2.4} color="var(--text-primary)" />
-                      </button>
-                    )}
 
                     <button 
                       className="sheet-btn"
