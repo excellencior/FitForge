@@ -9,7 +9,7 @@ import { useModalLock, useInputFocus, useToast } from '../utils/ux';
 import { exercises as defaultExercises } from '../data/workouts';
 import Modal from '../components/Modal';
 import {
-  Plus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
+  Plus, Minus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
   Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star, Calendar,
   GripVertical, Sparkles, Search, Moon
 } from 'lucide-react';
@@ -943,10 +943,27 @@ export default function WorkoutSheets() {
                   const info = getExerciseInfo(ex.exerciseId);
                   const type = getExerciseType(ex.exerciseId);
                   const isOpen = expandedExIdx === i;
-                  const tierColor = getTierColor(ex.exerciseId);
-                  const tierLabel = getTierLabel(ex.exerciseId);
                   const isDragging = dragIdx === i;
-                  const summary = `${ex.minSets || ex.sets || 3}-${ex.maxSets || ex.minSets || ex.sets || 5} × ${ex.reps}${ex.amrap ? '+' : ''} · ${ex.weight > 0 ? ex.weight + 'kg' : '—'} · ${ex.restMinutes}m rest`;
+                  const currentReps = ex.reps || 5;
+                  const currentSets = ex.minSets || ex.sets || 3;
+                  const summary = `${currentSets} sets × ${currentReps}${ex.amrap ? '+' : ''} reps`;
+
+                  const stepperBtnStyle = {
+                    width: 28,
+                    height: 28,
+                    borderRadius: '8px',
+                    border: '2px solid var(--border)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                    flexShrink: 0,
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: 'var(--shadow-sm)',
+                  };
 
                   return (
                     <div
@@ -958,7 +975,7 @@ export default function WorkoutSheets() {
                       style={{
                         background: 'var(--bg-card)',
                         borderRadius: '14px',
-                        border: '2px solid var(--border)',
+                        border: isOpen ? '2px solid var(--text-primary)' : '2px solid var(--border)',
                         overflow: 'hidden',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                         opacity: isDragging ? 0.4 : 1,
@@ -969,7 +986,7 @@ export default function WorkoutSheets() {
                           : 'sheetsExInsert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                       }}
                     >
-                      {/* Collapsed Header */}
+                      {/* Header */}
                       <div
                         onClick={() => setExpandedExIdx(isOpen ? null : i)}
                         style={{
@@ -987,9 +1004,11 @@ export default function WorkoutSheets() {
                             {renderExerciseIcon(type, 13)}
                             <span>{info.name}</span>
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                            <span>{summary}</span>
-                          </div>
+                          {!isOpen && (
+                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                              <span>{summary}</span>
+                            </div>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -1013,239 +1032,81 @@ export default function WorkoutSheets() {
                         </button>
                       </div>
 
-                      {/* Expanded Config */}
+                      {/* Inline Steppers */}
                       {isOpen && (
-                        <div className="ex-config-container" style={{ padding: '0 14px 14px', borderTop: '2px solid var(--border)', background: 'var(--bg-secondary)' }}>
-                          <div style={{ display: 'flex', gap: 4, marginTop: 10, marginBottom: 10 }}>
-                            <button 
-                              type="button" 
+                        <div style={{
+                          padding: '0 14px 12px',
+                          display: 'flex',
+                          gap: 12,
+                          alignItems: 'center',
+                          animation: 'sheetsExConfigExpand 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        }}>
+                          {/* Reps stepper */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <button
+                              type="button"
                               className="sheet-btn"
-                              style={{ 
-                                width: 28, 
-                                height: 28, 
-                                borderRadius: '8px',
-                                background: 'var(--bg-card)',
-                                border: '2px solid var(--border)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                boxShadow: 'var(--shadow-sm)',
-                              }} 
-                              onClick={() => moveExercise(i, -1)} 
-                              disabled={i === 0}
+                              style={stepperBtnStyle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (navigator.vibrate) navigator.vibrate(10);
+                                updateExerciseInSheet(i, 'reps', Math.max(1, currentReps - 1));
+                              }}
                             >
-                              <ChevronUp size={14} strokeWidth={2.4} color={i === 0 ? 'var(--text-tertiary)' : 'var(--text-primary)'} />
+                              <Minus size={14} strokeWidth={2.5} />
                             </button>
-                            <button 
-                              type="button" 
+                            <div style={{ flex: 1, textAlign: 'center' }}>
+                              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{currentReps}</div>
+                              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>reps</div>
+                            </div>
+                            <button
+                              type="button"
                               className="sheet-btn"
-                              style={{ 
-                                width: 28, 
-                                height: 28, 
-                                borderRadius: '8px',
-                                background: 'var(--bg-card)',
-                                border: '2px solid var(--border)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                boxShadow: 'var(--shadow-sm)',
-                              }} 
-                              onClick={() => moveExercise(i, 1)} 
-                              disabled={i === (editingSheet.exercises?.length || 0) - 1}
+                              style={stepperBtnStyle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (navigator.vibrate) navigator.vibrate(10);
+                                updateExerciseInSheet(i, 'reps', Math.min(30, currentReps + 1));
+                              }}
                             >
-                              <ChevronDown size={14} strokeWidth={2.4} color={i === (editingSheet.exercises?.length || 0) - 1 ? 'var(--text-tertiary)' : 'var(--text-primary)'} />
+                              <Plus size={14} strokeWidth={2.5} />
                             </button>
-                            <div style={{ flex: 1, fontSize: 11, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontWeight: 600 }}>
-                              Targeting: {info.muscle}
-                            </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Min Sets</label>
-                              <input 
-                                type="number" 
-                                inputMode="numeric" 
-                                min="1" 
-                                max="10" 
-                                style={{ 
-                                  width: '100%', 
-                                  background: 'var(--bg-card)', 
-                                  border: '2px solid var(--border)', 
-                                  borderRadius: '10px', 
-                                  padding: '8px', 
-                                  fontSize: 13, 
-                                  textAlign: 'center',
-                                  outline: 'none',
-                                  color: 'var(--text-primary)',
-                                  boxSizing: 'border-box',
-                                  transition: 'border-color 0.2s',
-                                  boxShadow: 'var(--shadow-sm)',
-                                }}
-                                value={ex.minSets || ex.sets || 3} 
-                                onChange={e => updateExerciseInSheet(i, 'minSets', +e.target.value)} 
-                                onFocus={handleFocus}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Max Sets</label>
-                              <input 
-                                type="number" 
-                                inputMode="numeric" 
-                                min="1" 
-                                max="10" 
-                                style={{ 
-                                  width: '100%', 
-                                  background: 'var(--bg-card)', 
-                                  border: '2px solid var(--border)', 
-                                  borderRadius: '10px', 
-                                  padding: '8px', 
-                                  fontSize: 13, 
-                                  textAlign: 'center',
-                                  outline: 'none',
-                                  color: 'var(--text-primary)',
-                                  boxSizing: 'border-box',
-                                  transition: 'border-color 0.2s',
-                                  boxShadow: 'var(--shadow-sm)',
-                                }}
-                                value={ex.maxSets || ex.minSets || ex.sets || 5} 
-                                onChange={e => updateExerciseInSheet(i, 'maxSets', +e.target.value)} 
-                                onFocus={handleFocus}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Reps</label>
-                              <input 
-                                type="number" 
-                                inputMode="numeric" 
-                                min="1" 
-                                max="30" 
-                                style={{ 
-                                  width: '100%', 
-                                  background: 'var(--bg-card)', 
-                                  border: '2px solid var(--border)', 
-                                  borderRadius: '10px', 
-                                  padding: '8px', 
-                                  fontSize: 13, 
-                                  textAlign: 'center',
-                                  outline: 'none',
-                                  color: 'var(--text-primary)',
-                                  boxSizing: 'border-box',
-                                  transition: 'border-color 0.2s',
-                                  boxShadow: 'var(--shadow-sm)',
-                                }}
-                                value={ex.reps} 
-                                onChange={e => updateExerciseInSheet(i, 'reps', +e.target.value)} 
-                                onFocus={handleFocus}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Weight (kg)</label>
-                              <input 
-                                type="number" 
-                                inputMode="decimal" 
-                                min="0" 
-                                step="0.5" 
-                                style={{ 
-                                  width: '100%', 
-                                  background: 'var(--bg-card)', 
-                                  border: '2px solid var(--border)', 
-                                  borderRadius: '10px', 
-                                  padding: '8px', 
-                                  fontSize: 13, 
-                                  textAlign: 'center',
-                                  outline: 'none',
-                                  color: 'var(--text-primary)',
-                                  boxSizing: 'border-box',
-                                  transition: 'border-color 0.2s',
-                                  boxShadow: 'var(--shadow-sm)',
-                                }}
-                                placeholder="0" 
-                                value={ex.weight || ''} 
-                                onChange={e => updateExerciseInSheet(i, 'weight', +e.target.value)} 
-                                onFocus={handleFocus}
-                              />
-                            </div>
-                          </div>
+                          {/* Divider */}
+                          <div style={{ width: 1, height: 28, background: 'var(--border)', flexShrink: 0 }} />
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Rest (min)</label>
-                              <input 
-                                type="number" 
-                                inputMode="decimal" 
-                                min="0.5" 
-                                max="10" 
-                                step="0.5" 
-                                style={{ 
-                                  width: '100%', 
-                                  background: 'var(--bg-card)', 
-                                  border: '2px solid var(--border)', 
-                                  borderRadius: '10px', 
-                                  padding: '8px', 
-                                  fontSize: 13, 
-                                  textAlign: 'center',
-                                  outline: 'none',
-                                  color: 'var(--text-primary)',
-                                  boxSizing: 'border-box',
-                                  transition: 'border-color 0.2s',
-                                  boxShadow: 'var(--shadow-sm)',
-                                }}
-                                value={ex.restMinutes} 
-                                onChange={e => updateExerciseInSheet(i, 'restMinutes', +e.target.value)} 
-                                onFocus={handleFocus}
-                              />
+                          {/* Sets stepper */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <button
+                              type="button"
+                              className="sheet-btn"
+                              style={stepperBtnStyle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (navigator.vibrate) navigator.vibrate(10);
+                                updateExerciseInSheet(i, 'minSets', Math.max(1, currentSets - 1));
+                              }}
+                            >
+                              <Minus size={14} strokeWidth={2.5} />
+                            </button>
+                            <div style={{ flex: 1, textAlign: 'center' }}>
+                              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{currentSets}</div>
+                              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>sets</div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                              <button
-                                type="button"
-                                className="sheet-btn"
-                                onClick={() => updateExerciseInSheet(i, 'amrap', !ex.amrap)}
-                                style={{
-                                  width: '100%',
-                                  height: '37px',
-                                  background: ex.amrap ? 'var(--text-primary)' : 'var(--bg-card)',
-                                  color: ex.amrap ? 'var(--bg-primary)' : 'var(--text-primary)',
-                                  border: '2px solid var(--border)',
-                                  borderRadius: '10px',
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: 6,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s',
-                                  boxShadow: 'var(--shadow-sm)'
-                                }}
-                              >
-                                <Check size={14} strokeWidth={2.4} color={ex.amrap ? 'var(--bg-primary)' : 'var(--text-tertiary)'} />
-                                AMRAP
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              className="sheet-btn"
+                              style={stepperBtnStyle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (navigator.vibrate) navigator.vibrate(10);
+                                updateExerciseInSheet(i, 'minSets', Math.min(10, currentSets + 1));
+                              }}
+                            >
+                              <Plus size={14} strokeWidth={2.5} />
+                            </button>
                           </div>
-
-                          <input
-                            style={{
-                              width: '100%',
-                              background: 'var(--bg-card)',
-                              border: '2px solid var(--border)',
-                              borderRadius: '10px',
-                              padding: '8px 10px',
-                              fontSize: 12,
-                              outline: 'none',
-                              color: 'var(--text-primary)',
-                              boxSizing: 'border-box',
-                              transition: 'border-color 0.2s',
-                              boxShadow: 'var(--shadow-sm)'
-                            }}
-                            placeholder="Notes (optional)"
-                            value={ex.notes || ''} 
-                            onChange={e => updateExerciseInSheet(i, 'notes', e.target.value)}
-                            onFocus={handleFocus}
-                          />
                         </div>
                       )}
                     </div>
