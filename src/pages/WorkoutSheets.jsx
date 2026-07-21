@@ -1041,41 +1041,6 @@ export default function WorkoutSheets() {
                           alignItems: 'center',
                           animation: 'sheetsExConfigExpand 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
                         }}>
-                          {/* Reps stepper */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                            <button
-                              type="button"
-                              className="sheet-btn"
-                              style={stepperBtnStyle}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (navigator.vibrate) navigator.vibrate(10);
-                                updateExerciseInSheet(i, 'reps', Math.max(1, currentReps - 1));
-                              }}
-                            >
-                              <Minus size={14} strokeWidth={2.5} />
-                            </button>
-                            <div style={{ flex: 1, textAlign: 'center' }}>
-                              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{currentReps}</div>
-                              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>reps</div>
-                            </div>
-                            <button
-                              type="button"
-                              className="sheet-btn"
-                              style={stepperBtnStyle}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (navigator.vibrate) navigator.vibrate(10);
-                                updateExerciseInSheet(i, 'reps', Math.min(30, currentReps + 1));
-                              }}
-                            >
-                              <Plus size={14} strokeWidth={2.5} />
-                            </button>
-                          </div>
-
-                          {/* Divider */}
-                          <div style={{ width: 1, height: 28, background: 'var(--border)', flexShrink: 0 }} />
-
                           {/* Sets stepper */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
                             <button
@@ -1102,6 +1067,41 @@ export default function WorkoutSheets() {
                                 e.stopPropagation();
                                 if (navigator.vibrate) navigator.vibrate(10);
                                 updateExerciseInSheet(i, 'minSets', Math.min(10, currentSets + 1));
+                              }}
+                            >
+                              <Plus size={14} strokeWidth={2.5} />
+                            </button>
+                          </div>
+
+                          {/* Divider */}
+                          <div style={{ width: 1, height: 28, background: 'var(--border)', flexShrink: 0 }} />
+
+                          {/* Reps stepper */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <button
+                              type="button"
+                              className="sheet-btn"
+                              style={stepperBtnStyle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (navigator.vibrate) navigator.vibrate(10);
+                                updateExerciseInSheet(i, 'reps', Math.max(1, currentReps - 1));
+                              }}
+                            >
+                              <Minus size={14} strokeWidth={2.5} />
+                            </button>
+                            <div style={{ flex: 1, textAlign: 'center' }}>
+                              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{currentReps}</div>
+                              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>reps</div>
+                            </div>
+                            <button
+                              type="button"
+                              className="sheet-btn"
+                              style={stepperBtnStyle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (navigator.vibrate) navigator.vibrate(10);
+                                updateExerciseInSheet(i, 'reps', Math.min(30, currentReps + 1));
                               }}
                             >
                               <Plus size={14} strokeWidth={2.5} />
