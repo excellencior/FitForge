@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, ChevronDown, ChevronUp, Dumbbell, Moon, Scale } from 'lucide-react';
+import { Check, Dumbbell, Moon, Scale } from 'lucide-react';
 import { exercises as rawExercises, workoutTemplates } from '../data/workouts';
 
 const legacyExerciseMap = {
@@ -60,7 +60,7 @@ import './Workout.css';
 function Workout() {
   const [workoutType, setWorkoutType] = useState('custom');
   const [template, setTemplate] = useState(null);
-  const [expandedExercise, setExpandedExercise] = useState(null);
+
 
   const [doneExercises, setDoneExercises] = useState({});
   const [showToast, setShowToast] = useState(false);
@@ -304,7 +304,6 @@ function Workout() {
 
         return (
           <div className="muscle-hero-card">
-            <h3 className="muscle-hero-card__title">Today's Target Muscles</h3>
             <div className="muscle-hero-card__body">
               <MuscleMap
                 exerciseIds={exIds}
@@ -373,7 +372,12 @@ function Workout() {
 
       <div style={{ marginTop: 8, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 16px' }}>
-          <h2 style={{ fontSize: 18, fontWeight: '700', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>Exercises</h2>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <h2 style={{ fontSize: 18, fontWeight: '700', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>Exercises</h2>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)' }}>
+              {Object.keys(doneExercises).filter(k => doneExercises[k]).length}/{template.exercises.length}
+            </span>
+          </div>
           <button
             onClick={() => { setWeightInput(''); setShowWeightModal(true); }}
             style={{
@@ -392,7 +396,6 @@ function Workout() {
         {template.exercises.map((exT, idx) => {
           const ex = exercises[exT.exerciseId] || { nameShort: exT.exerciseId, muscle: '', icon: '', formTips: [], warnings: [] };
           const weight = getExerciseWeight(exT.exerciseId, exT.weight);
-          const isExpanded = expandedExercise === idx;
           const isAmrapSet = exT.amrap;
           const numSets = exT.minSets || exT.sets || 3;
           const isDone = !!doneExercises[idx];
@@ -402,25 +405,20 @@ function Workout() {
               key={idx} 
               style={{
                 backgroundColor: isDone ? '#f0fdf4' : 'var(--bg-card)',
-                borderRadius: 16,
+                borderRadius: 14,
                 border: isDone ? '2px solid #86efac' : '2px solid var(--border)',
-                padding: '16px',
-                marginBottom: '16px',
-                boxShadow: isDone ? '0 0 0 1px rgba(34,197,94,0.1)' : 'var(--shadow-md)',
-                position: 'relative',
+                padding: '14px 16px',
+                marginBottom: 12,
+                boxShadow: isDone ? '0 0 0 1px rgba(34,197,94,0.1)' : 'var(--shadow-sm)',
                 transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                overflow: 'hidden'
               }}
             >
-              <div 
-                style={{ display: 'flex', alignItems: 'center', gap: 14 }}
-              >
-                {/* Single Checkbox for the entire exercise */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <div
                   onClick={(e) => toggleExerciseDone(e, idx, exT, ex, weight)}
                   style={{
-                    width: 32,
-                    height: 32,
+                    width: 28,
+                    height: 28,
                     borderRadius: '50%',
                     border: isDone ? '2px solid #22c55e' : '2px solid var(--border)',
                     backgroundColor: isDone ? '#22c55e' : 'var(--bg-card)',
@@ -430,106 +428,54 @@ function Workout() {
                     justifyContent: 'center',
                     cursor: 'pointer',
                     flexShrink: 0,
+                    marginTop: 1,
                     transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: isDone ? '0 2px 8px rgba(34,197,94,0.3)' : 'var(--shadow-sm)'
+                    boxShadow: isDone ? '0 2px 8px rgba(34,197,94,0.25)' : 'none'
                   }}
                 >
-                  {isDone && <Check size={18} strokeWidth={3} />}
+                  {isDone && <Check size={16} strokeWidth={3} />}
                 </div>
 
-                <div 
-                  onClick={() => setExpandedExercise(isExpanded ? null : idx)}
-                  style={{ flex: 1, minWidth: 0, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                >
-                  <div>
+                <div style={{ flex: 1, minWidth: 0, userSelect: 'none' }}>
+                  <span style={{ 
+                    fontSize: 15, 
+                    fontWeight: '700', 
+                    color: isDone ? '#15803d' : 'var(--text-primary)', 
+                    display: 'block', 
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1.2,
+                  }}>
+                    {ex.nameShort}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
                     <span style={{ 
-                      fontSize: 15, 
-                      fontWeight: '700', 
-                      color: isDone ? '#15803d' : 'var(--text-primary)', 
-                      display: 'block', 
-                      letterSpacing: '-0.01em'
+                      fontSize: 11, 
+                      color: isDone ? '#15803d' : 'var(--text-secondary)', 
+                      padding: '2px 8px',
+                      border: isDone ? '1px solid #bbf7d0' : '1px solid #e0e0e0',
+                      borderRadius: 6,
+                      fontWeight: 600,
+                      background: isDone ? '#dcfce7' : '#f0f0f0',
+                      lineHeight: '16px',
                     }}>
-                      {ex.nameShort}
+                      {numSets} sets
                     </span>
+                    <span style={{ fontSize: 10, color: isDone ? '#86efac' : '#bbbbbb', fontWeight: 700 }}>×</span>
                     <span style={{ 
-                      fontSize: 12, 
-                      color: isDone ? '#4ade80' : 'var(--text-tertiary)', 
-                      marginTop: 4, 
-                      display: 'block'
+                      fontSize: 11, 
+                      color: isDone ? '#15803d' : '#ffffff', 
+                      padding: '2px 8px',
+                      border: isDone ? '1px solid #bbf7d0' : '1px solid #aaaaaa',
+                      borderRadius: 6,
+                      fontWeight: 600,
+                      background: isDone ? '#dcfce7' : '#aaaaaa',
+                      lineHeight: '16px',
                     }}>
-                      {numSets} sets × {exT.reps}{isAmrapSet ? '+' : ''} reps · {weight > 0 ? `${weight} kg` : 'Bodyweight'}
+                      {exT.reps}{isAmrapSet ? '+' : ''} reps
                     </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', color: isDone ? '#4ade80' : 'var(--text-tertiary)' }}>
-                    {isExpanded ? <ChevronUp size={18} strokeWidth={2.4} /> : <ChevronDown size={18} strokeWidth={2.4} />}
                   </div>
                 </div>
               </div>
-
-              {/* Set Breakdown */}
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: 6, 
-                marginTop: 12, 
-                paddingTop: 12, 
-                borderTop: '1px solid ' + (isDone ? '#bbf7d0' : 'var(--border-light)') 
-              }}>
-                {Array.from({ length: numSets }, (_, s) => {
-                  const isLast = s === numSets - 1;
-                  const setLabel = isAmrapSet && isLast ? `Set ${s + 1} (AMRAP)` : `Set ${s + 1}`;
-                  return (
-                    <div key={s} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      borderRadius: 10,
-                      background: isDone ? '#dcfce7' : 'var(--bg-secondary)',
-                      border: isDone ? '1px solid #bbf7d0' : '1px solid var(--border)',
-                      transition: 'all 0.3s ease'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{
-                          width: 20, height: 20, borderRadius: '50%',
-                          background: isDone ? '#22c55e' : 'var(--bg-tertiary)',
-                          border: isDone ? 'none' : '1.5px solid var(--border)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#FFFFFF', fontSize: 10, fontWeight: 700,
-                          transition: 'all 0.2s'
-                        }}>
-                          {isDone ? <Check size={11} strokeWidth={3} /> : <span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>{s + 1}</span>}
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: isDone ? '#15803d' : 'var(--text-primary)' }}>
-                          {setLabel}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: isDone ? '#16a34a' : 'var(--text-tertiary)' }}>
-                        {exT.reps}{isAmrapSet && isLast ? '+' : ''} reps · {weight > 0 ? `${weight}kg` : 'BW'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {isExpanded && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid ' + (isDone ? '#bbf7d0' : 'var(--border-light)') }}>
-                  
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                    <span className="badge" style={{ backgroundColor: isDone ? '#dcfce7' : 'var(--bg-card)', border: isDone ? '1px solid #bbf7d0' : '1px solid var(--border)', color: isDone ? '#15803d' : 'var(--text-secondary)' }}>Muscle: {ex.muscle || 'Full Body'}</span>
-                    {isAmrapSet && <span className="badge" style={{ backgroundColor: isDone ? '#22c55e' : 'var(--text-primary)', color: '#FFFFFF', fontWeight: 700 }}>AMRAP Last Set</span>}
-                  </div>
-
-                  {ex.formTips && ex.formTips.length > 0 && (
-                    <div style={{ marginBottom: 10 }}>
-                      <span style={{ fontSize: 11, fontWeight: '700', color: isDone ? '#4ade80' : 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>Form Checklist</span>
-                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: isDone ? '#15803d' : 'var(--text-secondary)', lineHeight: 1.5 }}>
-                        {ex.formTips.map((tip, i) => <li key={i}>{tip}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}

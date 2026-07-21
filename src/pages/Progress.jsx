@@ -373,10 +373,7 @@ export default function Progress() {
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                          {pr.weight}kg × {pr.reps}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                          e1RM: {Math.round(pr.estimated1RM)}kg
+                          {pr.reps} reps
                         </div>
                       </div>
                     </div>

@@ -187,20 +187,17 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: 2px solid var(--border);
-  background: var(--bg-card);
+  border: none;
+  background: none;
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: var(--shadow-sm);
   -webkit-tap-highlight-color: transparent;
 }
 
 .anatomy-toggle--active {
-  background: var(--text-primary);
-  border-color: var(--text-primary);
-  color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .anatomy-toggle:not(.anatomy-toggle--active) {

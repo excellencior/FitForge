@@ -84,8 +84,11 @@ function GymAttendanceTracker() {
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const dayOfWeek = new Date(year, month, d).getDay();
-    const isScheduledRestDay = !schedule[weekdayKeys[dayOfWeek]];
-    cells.push({ day: d, date: dateStr, isGym: gymDates.has(dateStr), isToday: dateStr === todayStr, isRestDay: isScheduledRestDay });
+    const isGym = gymDates.has(dateStr);
+    const isPastDay = dateStr < todayStr;
+    // Any past day without a logged workout is treated as a rest day
+    const isScheduledRestDay = isPastDay ? !isGym : !schedule[weekdayKeys[dayOfWeek]];
+    cells.push({ day: d, date: dateStr, isGym, isToday: dateStr === todayStr, isRestDay: isScheduledRestDay });
   }
 
   const totalSessions = gymDates.size;
@@ -235,25 +238,16 @@ function GymAttendanceTracker() {
                   <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{templateName}</span>
                 </div>
               )}
-              {Object.entries(exerciseSets).map(([exId, { sets }]) => (
+              {Object.entries(exerciseSets).map(([exId, { sets }], i, arr) => (
                 <div key={exId} style={{
-                  background: 'var(--bg-secondary)',
-                  borderRadius: 14,
-                  border: '2px solid var(--border)',
-                  padding: '12px 14px',
+                  padding: '12px 0',
+                  borderBottom: i < arr.length - 1 ? '1px solid var(--border-light)' : 'none',
                 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
                     {getExName(exId)}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {sets.map((s, si) => (
-                      <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-                        <span style={{ fontWeight: 700, color: 'var(--text-tertiary)', minWidth: 20 }}>#{si + 1}</span>
-                        <span>{s.weight > 0 ? `${s.weight} kg` : 'BW'}</span>
-                        <span style={{ color: 'var(--text-tertiary)' }}>×</span>
-                        <span>{s.reps} reps</span>
-                      </div>
-                    ))}
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                    {sets.length} sets × {sets[0]?.reps || 0} reps
                   </div>
                 </div>
               ))}

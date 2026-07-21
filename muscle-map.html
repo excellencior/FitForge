@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Muscle Map — FitForge</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-dark: #0a0a0f;
+      --bg-card: rgba(255,255,255,0.04);
+      --bg-card-hover: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.08);
+      --border-active: rgba(255,255,255,0.18);
+      --text-primary: #f0f0f5;
+      --text-secondary: #a0a0b8;
+      --text-tertiary: #606078;
+      --accent: #6366f1;
+      --accent-glow: rgba(99,102,241,0.25);
+      --muscle-idle: #2a2a3a;
+      --muscle-hover: #3d3d55;
+      --muscle-selected: url(#selectedGradient);
+      --shadow-lg: 0 24px 48px rgba(0,0,0,0.4);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background blobs */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, #6366f1, transparent 70%);
+      top: -120px; left: -100px;
+    }
+    body::after {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, #f97316, transparent 70%);
+      bottom: -80px; right: -80px;
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    /* Header */
+    header {
+      text-align: center;
+      padding: 48px 24px 12px;
+    }
+    header h1 {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #f0f0f5 0%, #a0a0b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header p {
+      color: var(--text-tertiary);
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+
+    /* Selection counter pill */
+    .counter-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+      padding: 6px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+    .counter-pill .count {
+      color: var(--accent);
+      font-size: 14px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .counter-pill.has-selection {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    /* Main layout */
+    .main-content {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 32px;
+      padding: 24px 24px 48px;
+      flex-wrap: wrap;
+    }
+
+    /* SVG containers */
+    .map-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .map-wrapper {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px 24px 20px;
+      backdrop-filter: blur(16px);
+      transition: all 0.3s ease;
+      cursor: default;
+    }
+    .map-wrapper:hover {
+      border-color: var(--border-active);
+      background: var(--bg-card-hover);
+    }
+    .map-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-tertiary);
+    }
+
+    /* SVG muscle styling */
+    svg path[data-muscle-name] {
+      fill: var(--muscle-idle);
+      stroke: rgba(255,255,255,0.06);
+      stroke-width: 0.5;
+      transition: fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
+      cursor: pointer;
+    }
+    svg path[data-muscle-name]:hover {
+      fill: var(--muscle-hover);
+      stroke: rgba(255,255,255,0.15);
+      filter: brightness(1.3);
+    }
+    svg path[data-muscle-name].selected {
+      fill: url(#selectedGradient);
+      stroke: rgba(99,102,241,0.5);
+      stroke-width: 0.8;
+      filter: drop-shadow(0 0 6px rgba(99,102,241,0.35));
+    }
+    svg path[data-muscle-name].selected:hover {
+      filter: drop-shadow(0 0 10px rgba(99,102,241,0.5)) brightness(1.15);
+    }
+
+    /* Info Panel */
+    .info-panel {
+      width: 320px;
+      position: sticky;
+      top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+    }
+    .empty-state .icon {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(249,115,22,0.1));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 24px;
+    }
+    .empty-state h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .empty-state p {
+      font-size: 13px;
+      color: var(--text-tertiary);
+      line-height: 1.5;
+    }
+
+    /* Muscle detail card */
+    .muscle-detail {
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .muscle-detail .muscle-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .muscle-detail .muscle-name {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1.25;
+    }
+    .muscle-detail .muscle-common {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+    .muscle-detail .remove-btn {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text-tertiary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+      font-size: 14px;
+    }
+    .muscle-detail .remove-btn:hover {
+      background: rgba(239,68,68,0.15);
+      border-color: rgba(239,68,68,0.3);
+      color: #ef4444;
+    }
+
+    .detail-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+    }
+    .detail-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-tertiary);
+    }
+    .detail-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    /* Exercise tags */
+    .exercise-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .exercise-tag {
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.15);
+      font-size: 11px;
+      font-weight: 600;
+      color: #818cf8;
+      white-space: nowrap;
+    }
+
+    /* Selected list */
+    .selected-list-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-tertiary);
+      margin-bottom: 10px;
+    }
+    .selected-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 10px;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.18);
+      font-size: 12px;
+      font-weight: 600;
+      color: #c7d2fe;
+      margin: 0 6px 6px 0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .selected-chip:hover {
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.25);
+      color: #fca5a5;
+    }
+    .selected-chip .chip-x {
+      font-size: 10px;
+      opacity: 0.5;
+    }
+
+    /* Clear all btn */
+    .clear-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(239,68,68,0.2);
+      background: rgba(239,68,68,0.08);
+      color: #f87171;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+    .clear-btn:hover {
+      background: rgba(239,68,68,0.15);
+      border-color: rgba(239,68,68,0.35);
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1000;
+      padding: 6px 12px;
+      background: rgba(15,15,25,0.92);
+      border: 1px solid var(--border-active);
+      border-radius: 10px;
+      backdrop-filter: blur(12px);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+    }
+    .tooltip.visible { opacity: 1; }
+    .tooltip .tooltip-sub {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      margin-top: 1px;
+    }
+
+    /* Responsive */
+    @media (max-width: 960px) {
+      .main-content { flex-direction: column; align-items: center; }
+      .info-panel { width: 100%; max-width: 440px; position: static; }
+      .maps-row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    }
+    @media (max-width: 480px) {
+      header h1 { font-size: 24px; }
+      .map-wrapper { padding: 16px; border-radius: 18px; }
+      .map-wrapper svg { width: 140px; height: auto; }
+      .info-panel { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Muscle Anatomy</h1>
+      <p>Tap any muscle to explore details and exercises</p>
+      <div class="counter-pill" id="counterPill">
+        <span class="count" id="selectionCount">0</span>
+        <span>selected</span>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <div class="maps-row">
+        <!-- Front View -->
+        <div class="map-container">
+          <div class="map-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="156" height="288" viewBox="0 0 156 288" id="frontMap">
+              <defs>
+                <linearGradient id="selectedGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0" stop-color="#818cf8" />
+                  <stop offset="0.5" stop-color="#6366f1" />
+                  <stop offset="1" stop-color="#4f46e5" />
+                </linearGradient>
+              </defs>
+              <g id="head"><path id="head" data-muscle-name="Head" data-muscle-common="Head and Face" data-muscle-function="Head movement and facial expressions" data-muscle-region="head" data-muscle-exercises="neck stretches, head rotations" d="M69.0925903,35c0,4.25,2.722229,8.833313,8.9074097,8.833313s8.9074097-4.583313,8.9074097-8.833313c1.333313-.083313,2.9383545-.4980469,2.944458-3.666687.005127-2.666626-1.416687-3.194397-2.666687-2.666626v-6.888916c0-4.611084-4.722229-9.222229-9.1851807-9.222229s-9.1851807,4.611145-9.1851807,9.222229v6.888916c-1.25-.527771-2.671814,0-2.666687,2.666626.0061035,3.1686401,1.611145,3.583374,2.944458,3.666687Z"></path></g>
+              <g id="neck"><path id="sternocleidomastoid" data-muscle-name="Sternocleidomastoid" data-muscle-common="SCM Neck Muscle" data-muscle-function="Head rotation and flexion" data-muscle-region="neck" data-muscle-exercises="neck flexion, head rotations, neck bridges" d="M85.666687,43.833313s-2.7037354.9259644-7.666687.9259644-7.666687-.9259644-7.666687-.9259644c0,0,3.4074097,10.2592773,7.666687,15.2963257,4.2592773-5.0370483,7.666687-15.2963257,7.666687-15.2963257Z"></path><path id="trapezius_upper_front" data-muscle-name="Trapezius (Upper)" data-muscle-common="Upper Traps" data-muscle-function="Shoulder elevation and neck support" data-muscle-region="neck" data-muscle-exercises="shrugs, upright rows, overhead press" d="M75.5184937,58.722229c-7.6296387-2.0370483-14.8518066-2.222229-14.8518066-2.222229,0,0,6.3703613-4.555542,10.222168-7.0370483,0,0,2.4815063,7.0370483,4.6296387,9.2592773ZM80.4815063,58.722229c7.6296387-2.0370483,14.8518066-2.222229,14.8518066-2.222229,0,0-6.3703613-4.555542-10.222168-7.0370483,0,0-2.4815063,7.0370483-4.6296387,9.2592773Z"></path></g>
+              <g id="chest"><path id="pectoralis_major" data-muscle-name="Pectoralis Major" data-muscle-common="Pecs" data-muscle-function="Shoulder flexion, adduction, and internal rotation" data-muscle-region="chest" data-muscle-exercises="bench press, push-ups, chest flyes, dips" d="M76.3148193,68.555542l-20.583374-3.916626c1.388916-6.333374,19.305603-9.083374,20.583374,3.916626ZM79.6851807,68.555542l20.583374-3.916626c-1.388916-6.333374-19.305603-9.083374-20.583374,3.916626Z"></path><path id="pectoralis_minor" data-muscle-name="Pectoralis Minor" data-muscle-common="Upper Chest" data-muscle-function="Shoulder blade stabilization" data-muscle-region="chest" data-muscle-exercises="incline bench press, dips, chest dips" d="M55.5370483,66.666687l19.5247803,3.1845093c.7224121.1178589,1.2529907.7418823,1.2529907,1.473877v8.0670776c0,.7197266-.5143433,1.3305664-1.2207031,1.4685669-9.2557373,1.8076172-21.1526489,2.0804443-19.5570679-14.1940308ZM100.4629517,66.666687l-19.5247803,3.1845093c-.7224121.1178589-1.2529907.7418823-1.2529907,1.473877v8.0670776c0,.7197266.5143433,1.3305664,1.2207031,1.4685669,9.2557373,1.8076172,21.1526489,2.0804443,19.5570679-14.1940308Z"></path></g>
+              <g id="shoulders_front"><path id="deltoid_anterior" data-muscle-name="Anterior Deltoid" data-muscle-common="Front Delts" data-muscle-function="Shoulder flexion and internal rotation" data-muscle-region="shoulders" data-muscle-exercises="overhead press, front raises, push-ups, incline press" d="M61.2592773,58.722229c-9,1.444458-7.888916,13.555542-7.888916,13.555542,0,0-3.277771,3.055542-6.944458,5.333374-1.888855-19.166687,11.611145-22.388916,14.833374-18.888916ZM102.6296387,72.277771s3.277771,3.055542,6.944458,5.333374c1.888855-19.166687-11.611145-22.388916-14.833374-18.888916,9,1.444458,7.888916,13.555542,7.888916,13.555542Z"></path><path id="deltoid_middle_front" data-muscle-name="Middle Deltoid" data-muscle-common="Side Delts" data-muscle-function="Shoulder abduction" data-muscle-region="shoulders" data-muscle-exercises="lateral raises, overhead press, upright rows" d="M44.4259033,79.666687c-2-6.5-2.388855-18.666687,7.5-21.5-8.6422119,6.111084-7.5,21.5-7.5,21.5ZM111.5740967,79.666687c2-6.5,2.388855-18.666687-7.5-21.5,8.6422119,6.111084,7.5,21.5,7.5,21.5Z"></path></g>
+              <g id="biceps"><path id="biceps_long" data-muscle-name="Biceps (Long Head)" data-muscle-common="Outer Bicep" data-muscle-function="Elbow flexion and forearm supination" data-muscle-region="arms" data-muscle-exercises="curls, chin-ups, hammer curls, preacher curls" d="M41.7036743,99.277771c-1.444397-6.666626-1.8399658-12.777771,1.5800171-16.5s9.4199829-6.944458,9.4199829-6.944458c1.111145,10.388916-2.388855,21.055603-11,23.444458ZM103.2963257,75.833313c-1.111145,10.388916,2.388855,21.055603,11,23.444458,1.444397-6.666626,1.8399658-12.777771-1.5800171-16.5s-9.4199829-6.944458-9.4199829-6.944458Z"></path><path id="biceps_short" data-muscle-name="Biceps (Short Head)" data-muscle-common="Inner Bicep" data-muscle-function="Elbow flexion" data-muscle-region="arms" data-muscle-exercises="concentration curls, close-grip curls, cable curls" d="M54.7036743,75.833313c1.3399048,6.0458374,1,15.888916-7.444397,24.277832,7-11.277832,7.444397-24.277832,7.444397-24.277832ZM101.2963257,75.833313c-1.3399048,6.0458374-1,15.888916,7.444397,24.277832-7-11.277832-7.444397-24.277832-7.444397-24.277832Z"></path></g>
+              <g id="forearms_front"><path id="brachioradialis_front" data-muscle-name="Brachioradialis" data-muscle-common="Forearm" data-muscle-function="Elbow flexion and forearm rotation" data-muscle-region="forearms" data-muscle-exercises="hammer curls, reverse curls, rows" d="M25.6400757,132.4992676c-1.1851807-.4119263-2.3743286-.7174683-3.343811-.7399902,5.0370483-7.333374,6.888916-16,8.0740967-22.444458s5.777771-10.8148193,7.7036743-11.333313c1.2592773,4.5925903-.5184937,10.3703613-1.9259033,13.555542-1.2231445,2.7681274-8.597229,17.2229004-10.5080566,20.9622192ZM130.3599243,132.4992676c1.1851807-.4119263,2.3743286-.7174683,3.343811-.7399902-5.0370483-7.333374-6.888916-16-8.0740967-22.444458s-5.777771-10.8148193-7.7036743-11.333313c-1.2592773,4.5925903.5184937,10.3703613,1.9259033,13.555542,1.2231445,2.7681274,8.597229,17.2229004,10.5080566,20.9622192Z"></path><path id="flexor_carpi_front" data-muscle-name="Flexor Carpi Ulnaris" data-muscle-common="Wrist Flexor" data-muscle-function="Wrist flexion and grip strength" data-muscle-region="forearms" data-muscle-exercises="wrist curls, farmer carries, dead hangs" d="M41.8518677,110.944458c-1.5455933,2.2874756-10.1552124,17.8267822-12.9623413,22.9071045-.5664673-.2687378-1.2050781-.5559692-1.8797607-.8320312,2.0794678-4.3054199,9.8999023-20.4870605,12.1013184-24.8898926,2.5681763-5.1362915,6.2963257-5.6296387,6.2963257-5.6296387,0,0-1.7037354,5.7037354-3.555542,8.444458ZM116.888916,108.1296387c-2.5681763-5.1362915-6.2963257-5.6296387-6.2963257-5.6296387,0,0,1.7037354,5.7037354,3.555542,8.444458,1.5455933,2.2874756,10.1552124,17.8267822,12.9623413,22.9071045.5664673-.2687378,1.2050781-.5559692,1.8797607-.8320312-2.0794678-4.3054199-9.8999023-20.4870605-12.1013184-24.8898926Z"></path><path id="extensor_carpi_front" data-muscle-name="Extensor Carpi Ulnaris" data-muscle-common="Wrist Extensor" data-muscle-function="Wrist extension" data-muscle-region="forearms" data-muscle-exercises="wrist extensions, reverse curls, farmer carries" d="M47.555542,104.3518677c-.2962646,4.5925903-16.5184937,30.5925903-16.5184937,30.5925903,0,0-.4245605-.2363892-1.0932617-.5759277,3.3377686-5.9362793,14.857605-26.4119873,15.6488037-27.6463013.9259033-1.444458,1.9629517-2.3703613,1.9629517-2.3703613ZM108.444458,104.3518677c.2962646,4.5925903,16.5184937,30.5925903,16.5184937,30.5925903,0,0,.4245605-.2363892,1.0932617-.5759277-3.3377686-5.9362793-14.857605-26.4119873-15.6488037-27.6463013-.9259033-1.444458-1.9629517-2.3703613-1.9629517-2.3703613Z"></path></g>
+              <g id="hands_front"><path id="hands_front" data-muscle-name="Hands" data-muscle-common="Hands and Fingers" data-muscle-function="Grip and fine motor control" data-muscle-region="hands" data-muscle-exercises="grip trainers, dead hangs, farmer carries" d="M28.222229,136.4259033c.4814453.666687.111084,4.666687-1.2124634,6.9259644s-1.6394043,7.2962646-1.6764526,10c-.0370483,2.7036743-1.888855,4.111084-1.8518677,2.4074097.0370483-1.7037354,0-5.111145,0-6,0-.888916-.5925903-1.2592773-1-.229187-.4074097,1.0300293-2.2314453,6.5740356-2.9351196,8.055481-.7037354,1.4815063-2.4641113,1.1428833-2.0197144-.7089844.444458-1.8518677,1.621521-5.1543579,2.1400757-6.5988159.5184937-1.444458.2592163-2.1481323-.5185547-1.111084s-3,5.4814453-3.9629517,6.888855-3,1.0370483-2-.9259033,2.5184937-5.888916,2.9259033-7.1851807c.4074097-1.2963257.0740967-2-.555542-1.0740967-.6296387.9259644-2.5184937,3.333374-3.7036743,5.0740967s-2.888916.4814453-2.1481934-.777771c.7407837-1.2592773,4.2963257-7.6296387,5.1851807-8.8518677.888916-1.222229.2823486-2.5348511-1.4814453-1.222229-3.1851807,2.3703613-4.2592773,1.4815063-3,.1481323,1.2592773-1.333313,3.4074097-3.666626,5.2592773-4.5184937,1.8518066-.8518677,4.444397-1.777771,5.777771-3.0740967,0,0,3.2962646-.555542,6.777771,2.777771ZM146.2963257,151.166687c-.7407837-1.2592773-4.2963257-7.6296387-5.1851807-8.8518677-.888916-1.222229-.2823486-2.5348511,1.4814453-1.222229,3.1851807,2.3703613,4.2592773,1.4815063,3,.1481323-1.2592773-1.333313-3.4074097-3.666626-5.2592773-4.5184937-1.8518066-.8518677-4.444397-1.777771-5.777771-3.0740967,0,0-3.2962646-.555542-6.777771,2.777771-.4814453.666687-.111084,4.666687,1.2124634,6.9259644s1.6394043,7.2962646,1.6764526,10c.0370483,2.7036743,1.888855,4.111084,1.8518677,2.4074097-.0370483-1.7037354,0-5.111145,0-6,0-.888916.5925903-1.2592773,1-.229187.4074097,1.0300293,2.2314453,6.5740356,2.9351196,8.055481.7037354,1.4815063,2.4641113,1.1428833,2.0197144-.7089844-.444458-1.8518677-1.621521-5.1543579-2.1400757-6.5988159-.5184937-1.444458-.2592163-2.1481323.5185547-1.111084s3,5.4814453,3.9629517,6.888855,3,1.0370483,2-.9259033-2.5184937-5.888916-2.9259033-7.1851807c-.4074097-1.2963257-.0740967-2,.555542-1.0740967.6296387.9259644,2.5184937,3.333374,3.7036743,5.0740967s2.888916.4814453,2.1481934-.777771Z"></path></g>
+              <g id="abs"><path id="serratus_anterior" data-muscle-name="Serratus Anterior" data-muscle-common="Boxer's Muscle" data-muscle-function="Shoulder blade protraction" data-muscle-region="core" data-muscle-exercises="push-ups, overhead press, pull-overs, ab rollouts" d="M56.7592773,81.333313c1.277771,2.111145,8.666626,4.388916,8.666626,4.388916v7.222229c-5.944458-1.944458-8.9788818-7.145874-8.666626-11.611145ZM99.2407227,81.333313c-1.277771,2.111145-8.666626,4.388916-8.666626,4.388916v7.222229c5.944458-1.944458,8.9788818-7.145874,8.666626-11.611145Z"></path><path id="obliques_upper" data-muscle-name="External Obliques (Upper)" data-muscle-common="Side Abs" data-muscle-function="Torso rotation and side flexion" data-muscle-region="core" data-muscle-exercises="Russian twists, side planks, wood chops, oblique crunches" d="M55.7036743,87.972229h1.333374c3,6.194458,8.388855,6.694458,8.388855,6.694458,0,0-1.222229,12,0,18.388855-3.111084-3.166626-7.111084-5.166626-7.111084-5.166626.722229-9.555603-.9173584-13.7386475-2.9228516-18.444458.0487061-.675354.3117065-1.472229.3117065-1.472229ZM98.9629517,87.972229c-3,6.194458-8.388855,6.694458-8.388855,6.694458,0,0,1.222229,12,0,18.388855,3.111084-3.166626,7.111084-5.166626,7.111084-5.166626-.722229-9.555603.9173584-13.7386475,2.9228516-18.444458-.0487061-.675354-.3117065-1.472229-.3117065-1.472229h-1.333374Z"></path><path id="obliques_lower" data-muscle-name="External Obliques (Lower)" data-muscle-common="Lower Side Abs" data-muscle-function="Hip flexion and rotation" data-muscle-region="core" data-muscle-exercises="hanging leg raises, bicycle crunches, side planks" d="M65.222229,129.5c-3.5185547-5-7.8148193-7.3703613-7.8148193-7.3703613v-11.333313c1.222229-1.111145,2.9259033-1.0740967,7.8148193,4.6295776v14.0740967ZM98.5925903,110.7963257c-1.222229-1.111145-2.9259033-1.0740967-7.8148193,4.6295776v14.0740967c3.5185547-5,7.8148193-7.3703613,7.8148193-7.3703613v-11.333313Z"></path><path id="upper_abs" data-muscle-name="Rectus Abdominis (Upper)" data-muscle-common="Upper Abs" data-muscle-function="Spinal flexion" data-muscle-region="core" data-muscle-exercises="crunches, sit-ups, cable crunches" d="M76.3148193,84.833313c.8703613,1.7037354.861084,3.916687-1.0185547,5.333374-3.8950806,2.93573-7.9259033,5.1481323-7.9259033,5.1481323v-9.3703613s.888916-1.5925903,3.3703613-2.666687c2.4815063-1.0740356,4.7037354-.1481323,5.5740967,1.555542ZM88.6296387,85.944458s-.888916-1.5925903-3.3703613-2.666687c-2.4815063-1.0740356-4.7037354-.1481323-5.5740967,1.555542-.8703613,1.7037354-.861084,3.916687,1.0185547,5.333374,3.8950806,2.93573,7.9259033,5.1481323,7.9259033,5.1481323v-9.3703613Z"></path><path id="middle_abs" data-muscle-name="Rectus Abdominis (Middle)" data-muscle-common="Middle Abs" data-muscle-function="Spinal flexion" data-muscle-region="core" data-muscle-exercises="crunches, planks, leg raises" d="M77.333313,96.722229c0,4.9259033-6.0740356,6.666687-9.9629517,6v-4.7407227s3.5184937-3.4815063,5.777771-5.0370483,4.1851807.3703613,4.1851807,3.777771ZM88.6296387,97.9815063s-3.5184937-3.4815063-5.777771-5.0370483-4.1851807.3703613-4.1851807,3.777771c0,4.9259033,6.0740356,6.666687,9.9629517,6v-4.7407227Z"></path><path id="lower_abs" data-muscle-name="Rectus Abdominis (Lower)" data-muscle-common="Lower Abs" data-muscle-function="Hip flexion and spinal stabilization" data-muscle-region="core" data-muscle-exercises="leg raises, reverse crunches, mountain climbers" d="M67.3703613,111.6851807v-6.333313c5.8518677-3.0370483,9.9629517-1.4815063,9.9629517,1.111084,0,5.9259644-3.7036743,7.4074097-9.9629517,5.222229ZM78.666687,106.4629517c0,5.9259644,3.7036743,7.4074097,9.9629517,5.222229v-6.333313c-5.8518677-3.0370483-9.9629517-1.4815063-9.9629517,1.111084Z"></path><path id="six_pack" data-muscle-name="Rectus Abdominis" data-muscle-common="Six Pack" data-muscle-function="Spinal flexion and core stability" data-muscle-region="core" data-muscle-exercises="crunches, planks, leg raises, sit-ups" d="M88.7407227,118.833313c-.111084-3.916626-2.444397-4.805542-4.5369873-4.805542-3.2592773,0-3.9074097,2.694458-6.2037354,2.694458s-2.944458-2.694458-6.2037354-2.694458c-2.0925903,0-4.4259033.888916-4.5369873,4.805542-.111145,3.916687,2.222229,27.111145,10.7407227,27.111145s10.8518677-23.194458,10.7407227-27.111145Z"></path></g>
+              <g id="thighs"><path id="tensor_fasciae" data-muscle-name="Tensor Fasciae Latae" data-muscle-common="TFL Hip Muscle" data-muscle-function="Hip flexion and abduction" data-muscle-region="legs" data-muscle-exercises="leg raises, lunges, squats, hip abduction" d="M53.7592773,137.888916c.5-5.666687,2.333313-13.277771,2.333313-13.277771l1.666687.5s-2.222229,8.666626-4,12.777771ZM102.2407227,137.888916c-.5-5.666687-2.333313-13.277771-2.333313-13.277771l-1.666687.5s2.222229,8.666626,4,12.777771Z"></path><path id="pectineus" data-muscle-name="Pectineus" data-muscle-common="Hip Adductor" data-muscle-function="Hip flexion and adduction" data-muscle-region="legs" data-muscle-exercises="adductor machine, squats, lunges" d="M62.4814453,130.6851807c2.2592773.7037354,1.444458,3.1663818,1.444458,3.1663818-1.888855-.5737915-1.444458-3.1663818-1.444458-3.1663818ZM92.0740967,133.8515625c1.888855-.5737915,1.444458-3.1663818,1.444458-3.1663818-2.2592773.7037354-1.444458,3.1663818-1.444458,3.1663818Z"></path><path id="adductor_longus" data-muscle-name="Adductor Longus" data-muscle-common="Inner Thigh" data-muscle-function="Hip adduction" data-muscle-region="legs" data-muscle-exercises="adductor machine, side lunges, sumo squats" d="M65.222229,140.277771c-.777771-1.333313-1.1481934-4.4814453-.7407837-5.555542,2.111145.333313,3.5185547,2.666687,3.1852417,4.444458-.333374,1.777771-1.666687,2.444458-2.444458,1.111084ZM88.333313,139.166687c.333374,1.777771,1.666687,2.444458,2.444458,1.111084.777771-1.333313,1.1481934-4.4814453.7407837-5.555542-2.111145.333313-3.5185547,2.666687-3.1852417,4.444458Z"></path><path id="gracilis_front" data-muscle-name="Gracilis" data-muscle-common="Inner Thigh" data-muscle-function="Hip adduction and knee flexion" data-muscle-region="legs" data-muscle-exercises="leg curls, adductor exercises, side lunges" d="M74.666687,149.4629517c2.3703613,2.8148193,1.555542,13.7037354-1.0370483,20.444458-.5185547-8-3.6296387-17.1851807-4.5925903-20.222229-.9630127-3.0370483-1.6296387-7.1851807,0-11.1851807.7407227,4.5925903,3.2592163,8.1481323,5.6296387,10.9629517ZM86.9629517,138.5c-.7407227,4.5925903-3.2592163,8.1481323-5.6296387,10.9629517-2.3703613,2.8148193-1.555542,13.7037354,1.0370483,20.444458.5185547-8,3.6296387-17.1851807,4.5925903-20.222229.9630127-3.0370483,1.6296387-7.1851807,0-11.1851807Z"></path><path id="sartorius" data-muscle-name="Sartorius" data-muscle-common="Longest Muscle" data-muscle-function="Hip and knee flexion" data-muscle-region="legs" data-muscle-exercises="lunges, leg raises, cycling" d="M60.5925903,130.944458c3.4763794,16.666687,13.555542,22.555542,9.888855,50.666687.222229-18.777832-13.0740356-38.333374-9.888855-50.666687ZM95.4074097,130.944458c-3.4763794,16.666687-13.555542,22.555542-9.888855,50.666687-.222229-18.777832,13.0740356-38.333374,9.888855-50.666687Z"></path><path id="rectus_femoris" data-muscle-name="Rectus Femoris" data-muscle-common="Quad" data-muscle-function="Knee extension and hip flexion" data-muscle-region="legs" data-muscle-exercises="squats, leg press, lunges, leg extensions" d="M58.3703613,131.25c-.611084,17.638916,8.5925903,26.2129517,6.8148193,41.9907227-1.5111694,13.4118042-2.4815063,16.1481934-5.7037354,10.0370483-3.222168-6.111084-10.111084-32.4629517-1.111084-52.027771ZM96.5185547,183.277771c3.222168-6.111084,10.111084-32.4629517,1.111084-52.027771.611084,17.638916-8.5925903,26.2129517-6.8148193,41.9907227,1.5111694,13.4118042,2.4815063,16.1481934,5.7037354,10.0370483Z"></path><path id="vastus_lateralis_front" data-muscle-name="Vastus Lateralis" data-muscle-common="Outer Quad" data-muscle-function="Knee extension" data-muscle-region="legs" data-muscle-exercises="squats, leg press, lunges, leg extensions" d="M53.9147949,188.222229c-1.862915-5.6851807-3.4703369-19.6481323-1.7666626-31.944458,1.4815063,13.1851807,4.333313,23.888916,6.333313,28.888916s-2.7792358,8.5101929-4.5666504,3.055542ZM102.0852051,188.222229c1.862915-5.6851807,3.4703369-19.6481323,1.7666626-31.944458-1.4815063,13.1851807-4.333313,23.888916-6.333313,28.888916s2.7792358,8.5101929,4.5666504,3.055542Z"></path><path id="vastus_medialis" data-muscle-name="Vastus Medialis" data-muscle-common="Inner Quad (Teardrop)" data-muscle-function="Knee extension and stability" data-muscle-region="legs" data-muscle-exercises="squats, leg extensions, lunges, step-ups" d="M66.8703613,172.055542c1.944458,5.277771,4.666687,19.666687,0,19.666687-4.333313,0-.333313-14.111084,0-19.666687ZM89.1296387,191.722229c4.333313,0,.333313-14.111084,0-19.666687-1.944458,5.277771-4.666687,19.666687,0,19.666687Z"></path></g>
+              <g id="knees_front"><path id="knees_front" data-muscle-name="Knees" data-muscle-common="Knee Joint" data-muscle-function="Leg flexion and extension" data-muscle-region="legs" data-muscle-exercises="squats, lunges, leg curls, leg extensions" d="M63.3981323,187.888916h-3.055542c-1.555542,6.194397-4.583313,7.722229-6.4277954,2.972229,0,0-1.9333496,3.75-1.3777466,9.805542,1.4259033.166626,1.6851807-1.333374,3.055542-1.333374,2.055542,0,1.222229,9.833374,3.3692017,14.111145,0,0,1.3530273-2.166687,3.6863403-4.388916s6.444458-7.277771,6.7989502-15.4046021c-3.9232788.4286499-6.2434082-.8731689-6.0489502-5.7620239ZM63.2593384,194.333374c-1.211853-1.2525024-3.0291748-.7454834-4.2975464.27771.3464355-1.9772949,3.9766235-2.4949951,4.2975464-.27771ZM61.6650391,203.5916748c-1.1741943.5441284-2.8933105-.0274658-3.0169067-1.4249878,1.5964355,2.1131592,3.9620361.2197876,5.3887939-1.222229-.3482666,1.1278076-1.1749878,2.1685181-2.3718872,2.6472168ZM100.4074097,199.333313c1.3703613,0,1.6296387,1.5,3.055542,1.333374.555603-6.055542-1.3777466-9.805542-1.3777466-9.805542-1.8444824,4.75-4.8722534,3.222168-6.4277954-2.972229h-3.055542c.194458,4.888855-2.1256714,6.1906738-6.0489502,5.7620239.3544922,8.1268311,4.4656372,13.182373,6.7989502,15.4046021s3.6863403,4.388916,3.6863403,4.388916c2.1469727-4.277771,1.3136597-14.111145,3.3692017-14.111145ZM97.038208,194.611084c-1.2683716-1.0231934-3.0856934-1.5302124-4.2975464-.27771.3209229-2.2172852,3.9511108-1.699585,4.2975464.27771ZM94.3349609,203.5916748c-1.1968994-.4786987-2.0236206-1.5194092-2.3718872-2.6472168,1.4267578,1.4420166,3.7923584,3.3353882,5.3887939,1.222229-.1235962,1.397522-1.8427124,1.9691162-3.0169067,1.4249878Z"></path></g>
+              <g id="calves_front"><path id="peroneus_longus" data-muscle-name="Peroneus Longus" data-muscle-common="Lateral Calf" data-muscle-function="Ankle eversion and plantar flexion" data-muscle-region="calves" data-muscle-exercises="calf raises, ankle circles, balance work" d="M53.3703613,201.5c-2.222229,7-3.333313,19.055542-2.722229,27.722229-3.833313-9.166687-2.333313-20.166687,2.722229-27.722229ZM102.6296387,201.5c2.222229,7,3.333313,19.055542,2.722229,27.722229,3.833313-9.166687,2.333313-20.166687-2.722229-27.722229Z"></path><path id="gastrocnemius_front" data-muscle-name="Gastrocnemius" data-muscle-common="Calf" data-muscle-function="Ankle plantar flexion and knee flexion" data-muscle-region="calves" data-muscle-exercises="standing calf raises, jump rope, box jumps" d="M64.4259033,209.666687c-1,6.611084,1.888916,20.777771-4.833313,27.444458.666687-9.055603-.166687-17.388916,0-20.111145s2.611084-5.666687,4.833313-7.333313ZM96.4074097,217c-.166687-2.722229-2.611084-5.666687-4.833313-7.333313,1,6.611084-1.888916,20.777771,4.833313,27.444458-.666687-9.055603.166687-17.388916,0-20.111145Z"></path><path id="tibialis_anterior" data-muscle-name="Tibialis Anterior" data-muscle-common="Shin" data-muscle-function="Ankle dorsiflexion" data-muscle-region="calves" data-muscle-exercises="toe raises, ankle dorsiflexion, heel walks" d="M54.9814453,202.666687c.1004639,14.222229,3.277832,18.0925903,3.277832,37.5,0,8.8973999-2.277832,10.7851562-3.7407837,10.777771,0,0,.3703613-10.666687-1.777771-21.722229s.2963257-22.444458,2.2407227-26.555542ZM101.4815063,250.944458s-.3703613-10.666687,1.777771-21.722229-.2963257-22.444458-2.2407227-26.555542c-.1004639,14.222229-3.277832,18.0925903-3.277832,37.5,0,8.8973999,2.277832,10.7851562,3.7407837,10.777771Z"></path><path id="extensor_digitorum" data-muscle-name="Extensor Digitorum Longus" data-muscle-common="Toe Extensor" data-muscle-function="Toe extension and ankle dorsiflexion" data-muscle-region="calves" data-muscle-exercises="toe raises, ankle exercises, barefoot walking" d="M50.3148193,250.666687s.222229-11.388916,0-19.111145c3.722229,3.055603,2.333313,19.111145,2.333313,19.111145h-2.333313ZM103.3518677,250.666687h2.333313s-.222229-11.388916,0-19.111145c-3.722229,3.055603-2.333313,19.111145-2.333313,19.111145Z"></path></g>
+              <g id="feet_front"><path id="feet_front" data-muscle-name="Feet" data-muscle-common="Foot Muscles" data-muscle-function="Balance, stability, and propulsion" data-muscle-region="feet" data-muscle-exercises="toe raises, balance exercises, barefoot training" d="M57.8703613,252.722229c1,3.666687-.333313,12.5-.444458,15.611084-.111084,3.111145.888916,7.111145-6.333313,7.111145s-9.222229-3.111145-6-7.166687,4.333313-7.777771,4.333313-15.555542h8.444458ZM106.5740967,252.722229h-8.444458c-1,3.666687.333313,12.5.444458,15.611084.111084,3.111145-.888916,7.111145,6.333313,7.111145s9.222229-3.111145,6-7.166687-4.333313-7.777771-4.333313-15.555542Z"></path></g>
+            </svg>
+          </div>
+          <span class="map-label">Front</span>
+        </div>
+
+        <!-- Back View -->
+        <div class="map-container">
+          <div class="map-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="156" height="288" viewBox="0 0 156 288" id="backMap">
+              <defs>
+                <linearGradient id="selectedGradientBack" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0" stop-color="#818cf8" />
+                  <stop offset="0.5" stop-color="#6366f1" />
+                  <stop offset="1" stop-color="#4f46e5" />
+                </linearGradient>
+              </defs>
+              <g id="head_back"><path id="head_back" data-muscle-name="Head and Neck" data-muscle-common="Head" data-muscle-function="Head movement and stability" data-muscle-region="upper" data-muscle-exercises="neck stretches, head rotations" d="M68.4259033,35.7684937s.166687,2.777771.7963257,6.5c.6295776,3.722229,4.3703613,3.944458,8.777771,3.944458s8.1481934-.222229,8.777771-3.944458c.6296387-3.722229.7963257-6.5.7963257-6.5,1.666687-1.277771,2.722229-3.888855,3-6.5.277771-2.611084-1.166687-2.666626-2.333313-.944397.722229-4.5.3518066-15.611145-10.2407837-15.611145s-10.9630127,11.111145-10.2407837,15.611145c-1.166626-1.722229-2.611084-1.666687-2.333313.944397.277771,2.611145,1.333313,5.222229,3,6.5Z"></path></g>
+              <g id="upper_back"><path id="trapezius_upper_back" data-muscle-name="Upper Trapezius" data-muscle-common="Upper Traps" data-muscle-function="Shoulder elevation and neck support" data-muscle-region="upper" data-muscle-exercises="shrugs, upright rows, overhead press" d="M95.555603,54.027771c-2.5185547-2.5184937-9.1851807-7.333313-9.1851807-7.333313,0,0-4.9630127,1.0370483-8.3704224,1.0370483s-8.3704224-1.0370483-8.3704224-1.0370483c0,0-6.666626,4.8148193-9.1851807,7.333313,12.3704224.0740967,17.555603,2.9629517,17.555603,2.9629517,0,0,5.1851807-2.888855,17.555603-2.9629517Z"></path><path id="trapezius_back" data-muscle-name="Trapezius" data-muscle-common="Traps" data-muscle-function="Shoulder blade movement and upper back stability" data-muscle-region="upper" data-muscle-exercises="rows, deadlifts, face pulls, shrugs" d="M76.8148193,58.7129517v34c-9.944458-14-10.611145-33.333313-14.722229-36.944458,0,0,10.166626-.611084,14.722229,2.944458ZM79.1851807,58.7129517v34c9.944458-14,10.611145-33.333313,14.722229-36.944458,0,0-10.166626-.611084-14.722229,2.944458Z"></path><path id="infraspinatus" data-muscle-name="Infraspinatus" data-muscle-common="Rotator Cuff" data-muscle-function="External shoulder rotation and stability" data-muscle-region="upper" data-muscle-exercises="external rotations, face pulls, band pull-aparts" d="M60.0369873,57.6018677c4.111145,3.5,3.25,7.555542,6.5,16.944397-2.1087036-.5601196-11-3.833313-13.777771-11.222168,1.833374-3.833374,7.277771-5.722229,7.277771-5.722229ZM89.4630127,74.5462646c2.1087036-.5601196,11-3.833313,13.777771-11.222168-1.833374-3.833374-7.277771-5.722229-7.277771-5.722229-4.111145,3.5-3.25,7.555542-6.5,16.944397Z"></path><path id="teres_major" data-muscle-name="Teres Major" data-muscle-common="Lat Helper" data-muscle-function="Shoulder extension and internal rotation" data-muscle-region="upper" data-muscle-exercises="pull-ups, lat pulldowns, rows" d="M52.7592163,75.5092773s-.4259033-4.8148193-.388855-7.444458c0,0,4.8518677,5.6296387,11.4814453,7.2962646,0,0-5.666626,1.888916-11.0925903.1481934ZM92.1481934,75.361084s5.666626,1.888916,11.0925903.1481934c0,0,.4259033-4.8148193.388855-7.444458,0,0-4.8518677,5.6296387-11.4814453,7.2962646Z"></path></g>
+              <g id="shoulders_back"><path id="deltoid_posterior" data-muscle-name="Posterior Deltoid" data-muscle-common="Rear Delts" data-muscle-function="Shoulder extension and external rotation" data-muscle-region="upper" data-muscle-exercises="reverse flyes, face pulls, bent-over rows, rear delt raises" d="M58.4814453,55.7285156c-8.5,3.682251-7.9259033,11.5585327-7.9259033,11.5585327,0,0-4.5740967,5.0925903-7.9629517,7.2592163-.611145-8.388855,5.722229-19.388855,15.888855-18.817749ZM105.444458,67.2870483s4.5740967,5.0925903,7.9629517,7.2592163c.611145-8.388855-5.722229-19.388855-15.888855-18.817749,8.5,3.682251,7.9259033,11.5585327,7.9259033,11.5585327Z"></path><path id="deltoid_middle_back" data-muscle-name="Middle Deltoid" data-muscle-common="Side Delts" data-muscle-function="Shoulder abduction" data-muscle-region="upper" data-muscle-exercises="lateral raises, overhead press, upright rows" d="M40.7592163,77.6574097c-3.611084-7-1.333313-19,10.111145-21.555542-9.388916,4.944397-9.222229,14.722229-10.111145,21.555542ZM115.2407837,77.6574097c3.611084-7,1.333313-19-10.111145-21.555542,9.388916,4.944397,9.222229,14.722229,10.111145,21.555542Z"></path></g>
+              <g id="triceps"><path id="triceps_lateral_long" data-muscle-name="Triceps (Lateral & Long Head)" data-muscle-common="Triceps" data-muscle-function="Elbow extension and shoulder stability" data-muscle-region="arms" data-muscle-exercises="close-grip bench press, overhead extensions, dips, pushdowns" d="M34.8518066,97.583313c1.1481934-4.2407227,2.2963257-10.2592163,4.0185547-15.8703613l11.6463623-11.388855s.3536377,7.388855,1.2424927,14.555542c-4,4.611084-6.2036743,14.777771-7.3518066,16.6296387-1.1481934,1.8518066-4.2963257,3.2962646-3.888916,1.6295776.4074097-1.666626,1.7407227-6.555542,2.333313-8.2592163.5925903-1.7037354,1.8518677-7.7037354-.8148193-7.9629517-2.666626-.2592773-4.9629517,9.5925903-5.5925903,11.1851807-.6295776,1.5925903-2.003418.9990234-1.5925903-.5185547ZM104.2407837,84.8796387c4,4.611084,6.2036743,14.777771,7.3518066,16.6296387,1.1481934,1.8518066,4.2963257,3.2962646,3.888916,1.6295776-.4074097-1.666626-1.7407227-6.555542-2.333313-8.2592163-.5925903-1.7037354-1.8518677-7.7037354.8148193-7.9629517,2.666626-.2592773,4.9629517,9.5925903,5.5925903,11.1851807.6295776,1.5925903,2.003418.9990234,1.5925903-.5185547-1.1481934-4.2407227-2.2963257-10.2592163-4.0185547-15.8703613l-11.6463623-11.388855s-.3536377,7.388855-1.2424927,14.555542Z"></path><path id="triceps_medial" data-muscle-name="Triceps (Medial Head)" data-muscle-common="Triceps Inner" data-muscle-function="Elbow extension" data-muscle-region="arms" data-muscle-exercises="reverse grip pushdowns, close-grip press, dips" d="M41.7183838,94.4854736c-.5702515,2.171936-2.4313965,10.28302-2.9313965,11.366394-.5,1.083313-1.0305786,1.0045776-1.25-.555603-.25-1.777771-.260376-5.8329468.592041-8.541748,2.2709961-7.2166138,3.3251953-8.5273438,3.7919922-8.6435547.0888672.0087891.1489258.0234375.2353516.1586914.6933594,1.0825195-.0141602,4.6016846-.4379883,6.2158203ZM114.0789795,88.1109619c-.0888672.0087891-.1489258.0234375-.2353516.1586914-.6933594,1.0825195.0141602,4.6016846.4379883,6.2158203.5702515,2.171936,2.4313965,10.28302,2.9313965,11.366394.5,1.083313,1.0305786,1.0045776,1.25-.555603.25-1.777771.260376-5.8329468-.592041-8.541748-2.2709961-7.2166138-3.3251953-8.5273438-3.7919922-8.6435547Z"></path></g>
+              <g id="forearms_back"><path id="extensor_carpi_back" data-muscle-name="Extensor Carpi Ulnaris" data-muscle-common="Wrist Extensor" data-muscle-function="Wrist extension and ulnar deviation" data-muscle-region="forearms" data-muscle-exercises="wrist extensions, reverse curls, farmer carries" d="M33.3703613,99.1018677c1,1.2962646,2.6296387,4.4074097,3,6.888855.3703613,2.4815063-.7037354,5.7407837-2.6296387,6.888916-.111145,0,.222229-10.888916-.3703613-13.777771ZM119.6296387,105.9907227c-.3703613,2.4815063.7037354,5.7407837,2.6296387,6.888916.111145,0-.222229-10.888916.3703613-13.777771-1,1.2962646-2.6296387,4.4074097-3,6.888855Z"></path><path id="flexor_carpi_back" data-muscle-name="Flexor Carpi Ulnaris" data-muscle-common="Wrist Flexor" data-muscle-function="Wrist flexion and grip strength" data-muscle-region="forearms" data-muscle-exercises="wrist curls, farmer carries, dead hangs" d="M19.333313,132.3981323c3.8518677-7.5370483,9.2592773-28,10.222229-30.7407227s2.444458-1.7037354,2.7407227,0c.2963257,1.7036743.222229,7.7407227.2963257,11.8148193,0,0-9.7037354,19.1481323-10.888916,21.2592773-1.1851807,2.111084-4.041687.9369507-2.3703613-2.333374ZM136.666687,132.3981323c-3.8518677-7.5370483-9.2592773-28-10.222229-30.7407227s-2.444458-1.7037354-2.7407227,0c-.2963257,1.7036743-.222229,7.7407227-.2963257,11.8148193,0,0,9.7037354,19.1481323,10.888916,21.2592773,1.1851807,2.111084,4.041687.9369507,2.3703613-2.333374Z"></path><path id="brachioradialis_back" data-muscle-name="Brachioradialis" data-muscle-common="Forearm" data-muscle-function="Elbow flexion and forearm rotation" data-muscle-region="forearms" data-muscle-exercises="hammer curls, reverse curls, rows" d="M42.6295776,108.5092773c-1.333313,2.666626-13.1481323,20.5925903-14.4814453,23.3148193-1.333313,2.722168-1.277771,2.666626-1.333313,4.055542-.055603,1.388855-.888916,2.722229-2.388916,2.722229s-2.388916-2.555603-.277771-6.611145c2.111084-4.055542,13.5184937-22.3703613,17.0370483-25.9629517,2.1806641-2.2266235,2.777771-.1851807,1.444397,2.4815063ZM131.5740967,138.6018677c1.5,0,2.388916-2.555603.277771-6.611145-2.111084-4.055542-13.5184937-22.3703613-17.0370483-25.9629517-2.1806641-2.2266235-2.777771-.1851807-1.444397,2.4815063,1.333313,2.666626,13.1481323,20.5925903,14.4814453,23.3148193,1.333313,2.722168,1.277771,2.666626,1.333313,4.055542.055603,1.388855.888916,2.722229,2.388916,2.722229Z"></path></g>
+              <g id="hands_back"><path id="hands_back" data-muscle-name="Hands" data-muscle-common="Hands and Fingers" data-muscle-function="Grip and fine motor control" data-muscle-region="forearms" data-muscle-exercises="grip trainers, dead hangs, farmer carries" d="M25.9814453,144.2129517c-.138855,1.944458-1.583313,7.944458-1.777771,9.888916-.194458,1.944397-.2407227,4.9259033-.2407227,5.8148193,0,.888855-1.3518677,1.055542-1.3518677-.444458s-.611084-5.555542-.7592773-6.444458c-.1481323-.888916-1.2036743-.7592773-1.2036743.2592773,0,1.0184937-.333313,6.166626-.5370483,7.5184937-.2036743,1.3518677-2.0370483,1.2037354-1.9815063-.4259033.055603-1.6296387.055603-6.166687.0370483-7-.0184937-.833374-1.111084-.833374-1.222229-.0185547-.111084.8148193-.4814453,5.3518677-.6295776,6.611145-.1481934,1.2592773-1.6852417.9629517-1.666687-.4074097.0184937-1.3703613.0184937-5.722229.0184937-6.7592773s-.7592163.388916-1.0184937,1.4629517c-.2592773,1.0740967-.4815063,2.5-1.4074097,2.7963257-.9259033.2962646-.9096069-2.1933594-.1296387-4.2407227,1.0370483-2.722229,1.3292236-5.7019043,1.3292236-5.7019043-1.388916.138855-1.5328979-1.2055054-.0514526-1.612915.027771-1.527771.0092773-2.7963257.0648193-3.8240967.2232056-4.1290283,4.138916-4.305542,5.25-3.083313,1.111145,1.222229,3.166687,1.694397,5.111145,1.666626,1.944397-.027771,2.305542,2,2.166626,3.944458ZM143.888916,152.8240967c-1.0370483-2.722229-1.3292236-5.7019043-1.3292236-5.7019043,1.388916.138855,1.5328979-1.2055054.0514526-1.612915-.027771-1.527771-.0092773-2.7963257-.0648193-3.8240967-.2232056-4.1290283-4.138916-4.305542-5.25-3.083313-1.111145,1.222229-3.166687,1.694397-5.111145,1.666626-1.944397-.027771-2.305542,2-2.166626,3.944458.138855,1.944458,1.583313,7.944458,1.777771,9.888916.194458,1.944397.2407227,4.9259033.2407227,5.8148193,0,.888855,1.3518677,1.055542,1.3518677-.444458s.611084-5.555542.7592773-6.444458c.1481323-.888916,1.2036743-.7592773,1.2036743.2592773,0,1.0184937.333313,6.166626.5370483,7.5184937.2036743,1.3518677,2.0370483,1.2037354,1.9815063-.4259033-.055603-1.6296387-.055603-6.166687-.0370483-7,.0184937-.833374,1.111084-.833374,1.222229-.0185547.111084.8148193.4814453,5.3518677.6295776,6.611145.1481934,1.2592773,1.6852417.9629517,1.666687-.4074097-.0184937-1.3703613-.0184937-5.722229-.0184937-6.7592773s.7592163.388916,1.0184937,1.4629517c.2592773,1.0740077.4815063,2.5,1.4074097,2.7963257.9259033.2962646.9096069-2.1933594.1296387-4.2407227Z"></path></g>
+              <g id="lower_back"><path id="latissimus_dorsi" data-muscle-name="Latissimus Dorsi" data-muscle-common="Lats" data-muscle-function="Shoulder adduction, extension, and internal rotation" data-muscle-region="back" data-muscle-exercises="pull-ups, chin-ups, lat pulldowns, rows, deadlifts" d="M64.3703613,117.361084c-2.7407837-4.666626-6.5925903-16.888855-9.0370483-22.666626s-2.444458-11.8518677-2.222229-17.0370483c.2963257.0740967,8.333313.6592407,13.4259033-1.4111328,4.4259644,11.0407715,9.0925903,17.7814941,9.0925903,17.7814941v2.0740967s-7.111084,3.333313-11.2592163,21.2592163ZM100.666687,94.694458c2.444458-5.777771,2.444458-11.8518677,2.222229-17.0370483-.2963257.0740967-8.333313.6592407-13.4259033-1.4111328-4.4259644,11.0407715-9.0925903,17.7814941-9.0925903,17.7814941v2.0740967s7.111084,3.333313,11.2592163,21.2592163c2.7407837-4.666626,6.5925903-16.888855,9.0370483-22.666626Z"></path><path id="erector_spinae" data-muscle-name="Erector Spinae" data-muscle-common="Lower Back" data-muscle-function="Spinal extension and posture maintenance" data-muscle-region="back" data-muscle-exercises="deadlifts, back extensions, good mornings, hyperextensions" d="M78,128.472229c4.1481934-7.777771,12.3704224-9.6296387,12.3704224-9.6296387,0,0-5.1852417-21.2592773-12.3704224-21.2592773s-12.3704224,21.2592773-12.3704224,21.2592773c0,0,8.222229,1.8518677,12.3704224,9.6296387Z"></path></g>
+              <g id="glutes"><path id="gluteus_medius" data-muscle-name="Gluteus Medius" data-muscle-common="Hip Abductor" data-muscle-function="Hip abduction and pelvic stability" data-muscle-region="glutes" data-muscle-exercises="hip abductions, clamshells, side-lying leg raises, single-leg squats" d="M62.0925903,118.472229s-3.5740967,2.3703613-6.0185547,2.888855c0,0-.222229-10,1.777771-15.333313,2.2963257,5.1851807,4.2407837,12.444458,4.2407837,12.444458ZM98.1481934,106.027771c-2.2963257,5.1851807-4.2407837,12.444458-4.2407837,12.444458,0,0,3.5740967,2.3703613,6.0185547,2.888855,0,0,.222229-10-1.777771-15.333313Z"></path><path id="gluteus_maximus" data-muscle-name="Gluteus Maximus" data-muscle-common="Glutes" data-muscle-function="Hip extension and external rotation" data-muscle-region="glutes" data-muscle-exercises="squats, deadlifts, hip thrusts, lunges, step-ups" d="M95.777771,121.8398438c-9.333313-1.0027466-16.6821899,4.8375244-17.777771,11.2249756-1.0955811-6.3874512-8.444458-12.2277222-17.777771-11.2249756-5.333374,9.2249756-6.9630127,35.8175659,5.4073486,35.8175659,7.0740967,0,12.3704224-7,12.3704224-7,0,0,5.2963257,7,12.3704224,7,12.3703613,0,10.7407227-26.5925903,5.4073486-35.8175659Z"></path></g>
+              <g id="thighs_back"><path id="vastus_lateralis_back" data-muscle-name="Vastus Lateralis" data-muscle-common="Outer Quad" data-muscle-function="Knee extension" data-muscle-region="legs" data-muscle-exercises="squats, leg press, lunges, leg extensions" d="M52.1203613,150.5462646s1.25,5.444458,2.138855,12.944458c-1.888855,4.166687-4.277771,14.444458-4.277771,14.444458-1.055542-18.0925903,2.138916-27.388916,2.138916-27.388916ZM106.0185547,177.9351807c1.055542-18.0925903-2.138916-27.388916-2.138916-27.388916,0,0-1.25,5.444458-2.138855,12.944458,1.888855,4.166687,4.277771,14.444458,4.277771,14.444458Z"></path><path id="biceps_femoris" data-muscle-name="Biceps Femoris" data-muscle-common="Hamstring" data-muscle-function="Knee flexion and hip extension" data-muscle-region="legs" data-muscle-exercises="leg curls, Romanian deadlifts, good mornings, Nordic curls" d="M62.2556152,160.5460815c-1.4671631,4.1851196-5.7353516,17.5557251-5.3667603,30.5187378-4.666626,5.4074097-8.0740356,10.888855-8.0740356,10.888855,2.5925903-8.9629517,1.2860718-19.111084,3.1986084-27.333313,1.4943848-6.4248657,4.489624-13.1663818,5.7276611-15.8066406.3095093-.6600952,1.0657959-.9776001,1.7538452-.7367554l1.8898315.661438c.7409668.2593384,1.1305542,1.0668335.8708496,1.8076782ZM107.1851807,201.9536743c-2.5925903-8.9629517-1.2860718-19.111084-3.1986084-27.333313-1.4943848-6.4248657-4.489624-13.1663818-5.7276611-15.8066406-.3095093-.6600952-1.0657959-.9776001-1.7538452-.7367554l-1.8898315.661438c-.7409668.2593384-1.1305542,1.0668335-.8708496,1.8076782,1.4671631,4.1851196,5.7353516,17.5557251,5.3667603,30.5187378,4.666626,5.4074097,8.0740356,10.888855,8.0740356,10.888855Z"></path><path id="semitendinosus" data-muscle-name="Semitendinosus" data-muscle-common="Inner Hamstring" data-muscle-function="Knee flexion and hip extension" data-muscle-region="legs" data-muscle-exercises="leg curls, Romanian deadlifts, glute-ham raises" d="M67.2592163,162.694458c.5185547,3.1851807-.444397,11.7036743-2.111084,16.222229-1.666687,4.5184937-4.333313,13.555542-3.2963257,28.3703613-3.9259033-8.1481934-4.5925903-30.4653931,1.1851807-45.56604,1.1124268-2.9073486,3.7037354-2.211731,4.222229.9734497ZM92.9630127,161.7210083c-1.1124268-2.9073486-3.7037354-2.211731-4.222229.9734497-.5185547,3.1851807.444397,11.7036743,2.111084,16.222229,1.666687,4.5184937,4.333313,13.555542,3.2963257,28.3703613,3.9259033-8.1481934,4.5925903-30.4653931-1.1851807-45.56604Z"></path><path id="adductor_magnus" data-muscle-name="Adductor Magnus" data-muscle-common="Inner Thigh" data-muscle-function="Hip adduction and extension" data-muscle-region="legs" data-muscle-exercises="adductor machine, sumo squats, side lunges" d="M67.3998413,159.361084s6.0075684-.888855,8.748291-2.9629517c-.2935791,4.0027466-3.4074097,20.7407227-8.748291,29.333374,1.9334717-9.6296387,1.637146-23.333374,0-26.3704224ZM79.8518677,156.3981323c.2935791,4.0027466,3.4074097,20.7407227,8.748291,29.333374-1.9334717-9.6296387-1.637146-23.333374,0-26.3704224,0,0-6.0075684-.888855-8.748291-2.9629517Z"></path><path id="gracilis_back" data-muscle-name="Gracilis" data-muscle-common="Inner Thigh" data-muscle-function="Hip adduction and knee flexion" data-muscle-region="legs" data-muscle-exercises="leg curls, adductor exercises, side lunges" d="M66.5925903,179.9752197c.1343994,6.0644531.3703613,17.3118286-2.888916,24.4229126-1.111084-8.7407227.444458-20,2.888916-24.4229126ZM92.2963257,204.3981323c1.111084-8.7407227-.444458-20-2.888916-24.4229126-.1343994,6.0644531-.3703613,17.3118286,2.888916,24.4229126Z"></path></g>
+              <g id="calves_back"><path id="soleus" data-muscle-name="Soleus" data-muscle-common="Lower Calf" data-muscle-function="Ankle plantar flexion (bent knee)" data-muscle-region="calves" data-muscle-exercises="seated calf raises, calf press, walking" d="M54.2592163,197.2129517c1.222229,5.555542-5.2962646,18.7407227-4.9259033,30.5185547-2.0740967,3.333313-6.666687,4.1481323-6.666687,4.1481323-.444397-9.7037354.756958-21.3620605,11.5925903-34.666687ZM113.333374,231.8796387c.444397-9.7037354-.756958-21.3620605-11.5925903-34.666687-1.222229,5.555542,5.2962646,18.7407227,4.9259033,30.5185547,2.0740967,3.333313,6.666687,4.1481323,6.666687,4.1481323Z"></path><path id="gastrocnemius_back" data-muscle-name="Gastrocnemius" data-muscle-common="Calf" data-muscle-function="Ankle plantar flexion and knee flexion" data-muscle-region="calves" data-muscle-exercises="standing calf raises, jump rope, box jumps" d="M59.7036743,209.0648193c.5185547,2.888855.1726685,13.111084-.2962646,18.7407227-.3320923,3.9862061-1.111145,8.444458-4,8.222229-2.888916-.222229-4.8148193-5.4815063-3.7037354-15.111084,1.111145-9.6296387,4.0740967-17.7037354,6-21.0370483-.0740967.222229,1.4815063,6.2962646,2,9.1851807ZM104.2963257,220.916687c-1.111145-9.6296387-4.0740967-17.7037354-6-21.0370483.0740967.222229-1.4815063,6.2962646-2,9.1851807-.5185547,2.888855-.1726685,13.111084.2962646,18.7407227.3320923,3.9862061,1.111145,8.444458,4,8.222229,2.888916-.222229,4.8148193-5.4815063,3.7037354-15.111084Z"></path></g>
+              <g id="feet_back"><path id="feet_back" data-muscle-name="Feet" data-muscle-common="Foot Muscles" data-muscle-function="Balance, stability, and propulsion" data-muscle-region="feet" data-muscle-exercises="toe raises, balance exercises, barefoot training" d="M54.7407227,239.0648193s-4.8518677,11.4074097-4.2963257,15.555542c.555603,4.1481323,1.111145,10.0740967.5185547,13.1851807-.5925903,3.111145-2.5925903,7.4815063-6.0740967,7.4815063-3.4814453,0-5.0740356-2.6851807-5.5740356-4.8518677s-.611145-4.166687.611084-6.555542c1.222229-2.388916,2.6621094-8.222229,2.6643677-12.333374.0023193-4.111084,0-17.5184937,0-17.5184937,0,0,3.0393066.3703613,6.2245483-2.666687,1.6295776,5.4074097,5.9259033,7.7037354,5.9259033,7.7037354ZM113.409729,251.5462646c-.0023193-4.111084,0-17.5184937,0-17.5184937,0,0-3.0393066.3703613-6.2245483-2.666687-1.6295776,5.4074097-5.9259033,7.7037354-5.9259033,7.7037354,0,0,4.8518677,11.4074097,4.2963257,15.555542-.555603,4.1481323-1.111145,10.0740967-.5185547,13.1851807.5925903,3.111145,2.5925903,7.4815063,6.0740967,7.4815063,3.4814453,0,5.0740356-2.6851807,5.5740356-4.8518677s.611145-4.166687-.611084-6.555542c-1.222229-2.388916-2.6621094-8.222229-2.6643677-12.333374Z"></path></g>
+            </svg>
+          </div>
+          <span class="map-label">Back</span>
+        </div>
+      </div>
+
+      <!-- Info Panel -->
+      <div class="info-panel" id="infoPanel">
+        <div class="panel-card" id="detailCard">
+          <div class="empty-state" id="emptyState">
+            <div class="icon">🏋️</div>
+            <h3>Select a muscle</h3>
+            <p>Tap on any muscle group to see its details, function, and recommended exercises.</p>
+          </div>
+          <div id="muscleDetail" style="display:none;"></div>
+        </div>
+        <div class="panel-card" id="selectedPanel" style="display:none;">
+          <div class="selected-list-title">Selected muscles</div>
+          <div id="selectedChips"></div>
+          <button class="clear-btn" id="clearAllBtn">Clear all</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hover Tooltip -->
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-name"></div>
+    <div class="tooltip-sub"></div>
+  </div>
+
+  <script>
+    const selected = new Set();
+    let lastDetailName = null;
+
+    const tooltip = document.getElementById('tooltip');
+    const detailCard = document.getElementById('detailCard');
+    const emptyState = document.getElementById('emptyState');
+    const muscleDetail = document.getElementById('muscleDetail');
+    const selectedPanel = document.getElementById('selectedPanel');
+    const selectedChips = document.getElementById('selectedChips');
+    const counterPill = document.getElementById('counterPill');
+    const selectionCount = document.getElementById('selectionCount');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+
+    // Get all interactive muscle paths
+    const allPaths = document.querySelectorAll('path[data-muscle-name]');
+
+    // Hover tooltip
+    allPaths.forEach(path => {
+      path.addEventListener('mouseenter', (e) => {
+        const name = path.dataset.muscleName;
+        const common = path.dataset.muscleCommon;
+        tooltip.querySelector('.tooltip-name').textContent = name;
+        tooltip.querySelector('.tooltip-sub').textContent = common;
+        tooltip.classList.add('visible');
+      });
+
+      path.addEventListener('mousemove', (e) => {
+        tooltip.style.left = e.clientX + 14 + 'px';
+        tooltip.style.top = e.clientY - 10 + 'px';
+      });
+
+      path.addEventListener('mouseleave', () => {
+        tooltip.classList.remove('visible');
+      });
+
+      // Click to select/deselect
+      path.addEventListener('click', () => {
+        const name = path.dataset.muscleName;
+
+        if (selected.has(name)) {
+          selected.delete(name);
+        } else {
+          selected.add(name);
+        }
+
+        updateSelectionVisuals();
+        showDetail(path);
+      });
+    });
+
+    function updateSelectionVisuals() {
+      // Update all paths
+      allPaths.forEach(p => {
+        const name = p.dataset.muscleName;
+        if (selected.has(name)) {
+          p.classList.add('selected');
+          // For back SVG, use its own gradient
+          const isBack = p.closest('#backMap');
+          if (isBack) {
+            p.style.fill = 'url(#selectedGradientBack)';
+          } else {
+            p.style.fill = 'url(#selectedGradient)';
+          }
+        } else {
+          p.classList.remove('selected');
+          p.style.fill = '';
+        }
+      });
+
+      // Update counter
+      selectionCount.textContent = selected.size;
+      counterPill.classList.toggle('has-selection', selected.size > 0);
+
+      // Update selected chips
+      if (selected.size > 0) {
+        selectedPanel.style.display = '';
+        selectedChips.innerHTML = '';
+        selected.forEach(name => {
+          const chip = document.createElement('span');
+          chip.className = 'selected-chip';
+          chip.innerHTML = `${name} <span class="chip-x">✕</span>`;
+          chip.addEventListener('click', () => {
+            selected.delete(name);
+            updateSelectionVisuals();
+            if (lastDetailName === name) {
+              emptyState.style.display = '';
+              muscleDetail.style.display = 'none';
+              lastDetailName = null;
+            }
+          });
+          selectedChips.appendChild(chip);
+        });
+      } else {
+        selectedPanel.style.display = 'none';
+      }
+    }
+
+    function showDetail(path) {
+      const name = path.dataset.muscleName;
+      const common = path.dataset.muscleCommon;
+      const fn = path.dataset.muscleFunction;
+      const region = path.dataset.muscleRegion;
+      const exercises = path.dataset.muscleExercises;
+      lastDetailName = name;
+
+      const exerciseTags = exercises.split(',').map(e => e.trim()).filter(Boolean)
+        .map(e => `<span class="exercise-tag">${e}</span>`).join('');
+
+      muscleDetail.innerHTML = `
+        <div class="muscle-detail">
+          <div class="muscle-header">
+            <div>
+              <div class="muscle-name">${name}</div>
+              <div class="muscle-common">${common}</div>
+            </div>
+            <button class="remove-btn" title="Deselect" onclick="deselectMuscle('${name}')">✕</button>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Region</span>
+            <span class="detail-value">${region.charAt(0).toUpperCase() + region.slice(1)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Function</span>
+            <span class="detail-value">${fn}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Exercises</span>
+            <div class="exercise-tags">${exerciseTags}</div>
+          </div>
+        </div>
+      `;
+
+      emptyState.style.display = 'none';
+      muscleDetail.style.display = '';
+    }
+
+    window.deselectMuscle = function(name) {
+      selected.delete(name);
+      updateSelectionVisuals();
+      emptyState.style.display = '';
+      muscleDetail.style.display = 'none';
+      lastDetailName = null;
+    };
+
+    clearAllBtn.addEventListener('click', () => {
+      selected.clear();
+      updateSelectionVisuals();
+      emptyState.style.display = '';
+      muscleDetail.style.display = 'none';
+      lastDetailName = null;
+    });
+  </script>
+</body>
+</html>
