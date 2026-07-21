@@ -53,6 +53,8 @@ const exercises = new Proxy(rawExercises, {
 
 import { getTodayWorkoutType, saveWorkoutLog, removeWorkoutLogByExercise, updatePR, getToday, getPRRecords, getTodayRoutine, saveBodyStat, getWorkoutsByDate } from '../utils/storage';
 import Modal from '../components/Modal';
+import MuscleMap from '../components/MuscleMap';
+import { muscleMappings } from '../data/muscleMappings';
 import './Workout.css';
 
 function Workout() {
@@ -279,6 +281,53 @@ function Workout() {
         <h1 style={{ fontSize: 24, fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: '-0.02em' }}>{template.name}</h1>
         <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0, fontWeight: '500' }}>{todayFormatted()}</p>
       </div>
+
+      {/* Muscle Map Hero Card */}
+      {(() => {
+        const exIds = template.exercises.map(e => e.exerciseId);
+        const hasMuscles = exIds.some(id => {
+          const m = muscleMappings[id];
+          return m && (m.primary.length > 0 || m.secondary.length > 0);
+        });
+        // Count unique primary and secondary muscles
+        const primarySet = new Set();
+        const secondarySet = new Set();
+        exIds.forEach(id => {
+          const m = muscleMappings[id];
+          if (m) {
+            m.primary.forEach(p => primarySet.add(p));
+            m.secondary.forEach(s => secondarySet.add(s));
+          }
+        });
+        // Primary wins
+        primarySet.forEach(p => secondarySet.delete(p));
+
+        return (
+          <div className="muscle-hero-card">
+            <h3 className="muscle-hero-card__title">Today's Target Muscles</h3>
+            <div className="muscle-hero-card__body">
+              <MuscleMap
+                exerciseIds={exIds}
+                view="auto"
+                size="lg"
+                showLabel={!hasMuscles}
+              />
+            </div>
+            {hasMuscles && (
+              <div className="muscle-hero-card__legend">
+                <span className="muscle-hero-card__legend-item">
+                  <span className="muscle-hero-card__legend-dot" style={{ background: '#ef4444' }} />
+                  {primarySet.size} primary
+                </span>
+                <span className="muscle-hero-card__legend-item">
+                  <span className="muscle-hero-card__legend-dot" style={{ background: '#93c5fd' }} />
+                  {secondarySet.size} secondary
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Weight Log Modal */}
       <Modal isOpen={showWeightModal} onClose={() => setShowWeightModal(false)} type="centered-alert">

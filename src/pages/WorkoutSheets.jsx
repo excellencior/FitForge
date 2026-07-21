@@ -11,8 +11,10 @@ import Modal from '../components/Modal';
 import {
   Plus, Minus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
   Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star, Calendar,
-  GripVertical, Sparkles, Search, Moon
+  GripVertical, Sparkles, Search, Moon, PersonStanding
 } from 'lucide-react';
+import MuscleMap, { MuscleMapLazy } from '../components/MuscleMap';
+import '../components/MuscleMap.css';
 
 const KEYFRAMES_ID = 'sheets-keyframes';
 if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
@@ -76,6 +78,10 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
     }
     .modal-content::-webkit-scrollbar {
       display: none !important;
+    }
+    .modal-content {
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
     }
     .ios-form-row {
       transition: background-color 0.2s ease;
@@ -179,6 +185,13 @@ export default function WorkoutSheets() {
   const catalogSearchRef = useRef(null);
   const catalogExpandedRef = useRef(false);
   const exercisesSnapshot = useRef(null);
+  const [anatomyMode, setAnatomyMode] = useState(false);
+  const [longPressExercise, setLongPressExercise] = useState(null);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const longPressTimerRef = useRef(null);
+  const catalogContentRef = useRef(null);
+  const previewExpandedRef = useRef(false);
+  const previewContentRef = useRef(null);
   
   const handleFocus = useInputFocus();
   const { toast, show: showToast } = useToast();
@@ -200,7 +213,23 @@ export default function WorkoutSheets() {
     });
   };
 
-  useModalLock(showEditor || showCatalog || !!showDeleteConfirm || !!dayPickerDay);
+  const previewScrollRafRef = useRef(null);
+  const handlePreviewScroll = (e) => {
+    const target = e.currentTarget;
+    if (previewScrollRafRef.current) return;
+    previewScrollRafRef.current = requestAnimationFrame(() => {
+      previewScrollRafRef.current = null;
+      if (target.scrollTop > 0 && !previewExpandedRef.current) {
+        previewExpandedRef.current = true;
+        setPreviewExpanded(true);
+      } else if (target.scrollTop <= 1 && previewExpandedRef.current) {
+        previewExpandedRef.current = false;
+        setPreviewExpanded(false);
+      }
+    });
+  };
+
+  useModalLock(showEditor || showCatalog || !!showDeleteConfirm || !!dayPickerDay || !!longPressExercise);
 
   useEffect(() => {
     loadData();
@@ -254,7 +283,7 @@ export default function WorkoutSheets() {
   };
 
   const openEditSheet = (sheet) => {
-    setEditingSheet({ ...sheet, exercises: [...sheet.exercises] });
+    setEditingSheet({ ...sheet, exercises: [...(sheet.exercises || [])] });
     setShowEditor(true);
   };
 
@@ -280,14 +309,14 @@ export default function WorkoutSheets() {
       // Remove it
       setEditingSheet(prev => ({
         ...prev,
-        exercises: prev.exercises.filter(e => e.exerciseId !== catalogExercise.id),
+        exercises: (prev.exercises || []).filter(e => e.exerciseId !== catalogExercise.id),
       }));
       if (navigator.vibrate) navigator.vibrate(10);
     } else {
       // Add it
       setEditingSheet(prev => ({
         ...prev,
-        exercises: [...prev.exercises, {
+        exercises: [...(prev.exercises || []), {
           exerciseId: catalogExercise.id,
           minSets: 3,
           maxSets: 5,
@@ -316,7 +345,7 @@ export default function WorkoutSheets() {
     setTimeout(() => {
       setEditingSheet(prev => ({
         ...prev,
-        exercises: prev.exercises.filter((_, i) => i !== index),
+        exercises: (prev.exercises || []).filter((_, i) => i !== index),
       }));
       setRemovingExIdx(null);
 
@@ -330,7 +359,7 @@ export default function WorkoutSheets() {
     if (!undoExercise) return;
     clearTimeout(undoExercise.timer);
     setEditingSheet(prev => {
-      const exercises = [...prev.exercises];
+      const exercises = [...(prev.exercises || [])];
       const insertAt = Math.min(undoExercise.index, exercises.length);
       exercises.splice(insertAt, 0, undoExercise.exercise);
       return { ...prev, exercises };
@@ -340,7 +369,7 @@ export default function WorkoutSheets() {
 
   const updateExerciseInSheet = (index, field, value) => {
     setEditingSheet(prev => {
-      const exercises = [...prev.exercises];
+      const exercises = [...(prev.exercises || [])];
       exercises[index] = { ...exercises[index], [field]: value };
       return { ...prev, exercises };
     });
@@ -348,7 +377,7 @@ export default function WorkoutSheets() {
 
   const moveExercise = (index, direction) => {
     setEditingSheet(prev => {
-      const exercises = [...prev.exercises];
+      const exercises = [...(prev.exercises || [])];
       const newIndex = index + direction;
       if (newIndex < 0 || newIndex >= exercises.length) return prev;
       [exercises[index], exercises[newIndex]] = [exercises[newIndex], exercises[index]];
@@ -358,7 +387,7 @@ export default function WorkoutSheets() {
 
   const autoOrderExercises = () => {
     setEditingSheet(prev => {
-      const sorted = [...prev.exercises].sort((a, b) => {
+      const sorted = [...(prev.exercises || [])].sort((a, b) => {
         const pa = EXERCISE_PRIORITY[a.exerciseId] ?? 45;
         const pb = EXERCISE_PRIORITY[b.exerciseId] ?? 45;
         return pa - pb;
@@ -374,7 +403,7 @@ export default function WorkoutSheets() {
     e.preventDefault();
     if (dragIdx === null || dragIdx === i) return;
     setEditingSheet(prev => {
-      const exercises = [...prev.exercises];
+      const exercises = [...(prev.exercises || [])];
       const [moved] = exercises.splice(dragIdx, 1);
       exercises.splice(i, 0, moved);
       return { ...prev, exercises };
@@ -399,6 +428,28 @@ export default function WorkoutSheets() {
   };
 
 
+
+  const handleTouchStart = (exerciseId) => {
+    if (anatomyMode) return; // No long-press in anatomy mode
+    longPressTimerRef.current = setTimeout(() => {
+      setLongPressExercise(exerciseId);
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 500);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchMove = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   const handleAssignRoutine = (dayKey, sheetId) => {
     // Already selected — do nothing
@@ -723,7 +774,7 @@ export default function WorkoutSheets() {
       {editingSheet && (
         <Modal
           isOpen={showEditor}
-          onClose={() => { setShowEditor(false); setEditingSheet(null); }}
+          onClose={() => { setShowEditor(false); setEditingSheet(null); setAnatomyMode(false); }}
           type="bottom-sheet"
           hideHeader
         >
@@ -902,29 +953,41 @@ export default function WorkoutSheets() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Exercises ({editingSheet.exercises?.length || 0})</span>
-                {editingSheet.exercises?.length >= 2 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {editingSheet.exercises?.length >= 2 && (
+                    <button
+                      type="button"
+                      className="sheet-btn"
+                      style={{ 
+                        background: 'var(--bg-card)', 
+                        color: 'var(--text-primary)', 
+                        fontSize: 11, 
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                         border: '2px solid var(--border)',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
+                        cursor: 'pointer',
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
+                      onClick={autoOrderExercises}
+                    >
+                      <Sparkles size={12} strokeWidth={2.4} /> Optimize Order
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="sheet-btn"
-                    style={{ 
-                      background: 'var(--bg-card)', 
-                      color: 'var(--text-primary)', 
-                      fontSize: 11, 
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                       border: '2px solid var(--border)',
-                      borderRadius: '8px',
-                      padding: '6px 10px',
-                      cursor: 'pointer',
-                      boxShadow: 'var(--shadow-sm)',
-                    }}
-                    onClick={autoOrderExercises}
+                    className={`anatomy-toggle${anatomyMode ? ' anatomy-toggle--active' : ''}`}
+                    onClick={() => setAnatomyMode(m => !m)}
+                    aria-label="Toggle muscle anatomy view"
+                    aria-pressed={anatomyMode}
+                    title="Show muscle anatomy"
                   >
-                    <Sparkles size={12} strokeWidth={2.4} /> Optimize Order
+                    <PersonStanding size={14} strokeWidth={2.4} />
                   </button>
-                )}
+                </div>
               </div>
 
               {(!editingSheet.exercises || editingSheet.exercises.length === 0) && (
@@ -1201,6 +1264,7 @@ export default function WorkoutSheets() {
         type="bottom-sheet"
         fullscreen={catalogExpanded}
         onContentScroll={handleCatalogScroll}
+        contentRef={catalogContentRef}
         hideHeader
       >
         {/* Unified header */}
@@ -1396,10 +1460,14 @@ export default function WorkoutSheets() {
                       key={ex.id}
                       className="catalog-item-anim"
                       onClick={() => toggleExerciseInSheet(ex)}
+                      onTouchStart={() => handleTouchStart(ex.id)}
+                      onTouchEnd={handleTouchEnd}
+                      onTouchMove={handleTouchMove}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
+                        flexDirection: anatomyMode ? 'column' : 'row',
+                        alignItems: anatomyMode ? 'stretch' : 'center',
+                        gap: anatomyMode ? 8 : 12,
                         width: '100%',
                         padding: '12px 14px',
                         background: alreadyAdded ? '#f0fdf4' : 'var(--bg-card)',
@@ -1411,29 +1479,45 @@ export default function WorkoutSheets() {
                         animationDelay: `${Math.min(i * 20, 300)}ms`,
                       }}
                     >
-                      <div style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: alreadyAdded ? '50%' : '10px',
-                        background: alreadyAdded ? '#22c55e' : 'var(--bg-secondary)',
-                        border: alreadyAdded ? '1.5px solid #16a34a' : '1.5px solid var(--border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease',
-                      }}>
-                        {alreadyAdded ? (
-                          <Check size={16} strokeWidth={3} color="#FFFFFF" />
-                        ) : (
-                          renderExerciseIcon(ex.type, 16)
-                        )}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: alreadyAdded ? '#15803d' : 'var(--text-primary)' }}>{ex.name}</div>
-                        <div style={{ fontSize: 11, color: alreadyAdded ? '#4ade80' : 'var(--text-tertiary)', marginTop: 2, fontWeight: 600 }}>
-                          {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+                        <div style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: alreadyAdded ? '50%' : '10px',
+                          background: alreadyAdded ? '#22c55e' : 'var(--bg-secondary)',
+                          border: alreadyAdded ? '1.5px solid #16a34a' : '1.5px solid var(--border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease',
+                        }}>
+                          {alreadyAdded ? (
+                            <Check size={16} strokeWidth={3} color="#FFFFFF" />
+                          ) : (
+                            renderExerciseIcon(ex.type, 16)
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: alreadyAdded ? '#15803d' : 'var(--text-primary)' }}>{ex.name}</div>
+                          <div style={{ fontSize: 11, color: alreadyAdded ? '#4ade80' : 'var(--text-tertiary)', marginTop: 2, fontWeight: 600 }}>
+                            {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
+                          </div>
                         </div>
                       </div>
+                      
+                      {anatomyMode && (
+                        <div className="catalog-muscle-inline">
+                          <MuscleMapLazy
+                            exerciseId={ex.id}
+                            rootRef={catalogContentRef}
+                            view="auto"
+                            size="sm"
+                            primaryColor={alreadyAdded ? '#ef4444' : '#ef4444'}
+                            secondaryColor={alreadyAdded ? '#fca5a5' : '#93c5fd'}
+                            idleColor={alreadyAdded ? '#d1d5db' : '#e5e5e5'}
+                          />
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -1443,8 +1527,99 @@ export default function WorkoutSheets() {
         </div>
       </Modal>
 
+      {/* ===== MUSCLE PREVIEW MODAL (Long-Press) ===== */}
+      <Modal
+        isOpen={!!longPressExercise}
+        onClose={() => { setLongPressExercise(null); setPreviewExpanded(false); previewExpandedRef.current = false; }}
+        type="bottom-sheet"
+        fullscreen={previewExpanded}
+        onContentScroll={handlePreviewScroll}
+        contentRef={previewContentRef}
+        hideHeader
+      >
+        {longPressExercise && (() => {
+          const exData = defaultExercises[longPressExercise] || {};
+          return (
+            <div style={{ paddingBottom: 16 }}>
+              {/* Custom sticky header */}
+              <div style={{
+                position: 'sticky',
+                top: -24,
+                background: 'var(--bg-secondary)',
+                zIndex: 101,
+                margin: '-24px -20px 16px -20px',
+                padding: '16px 20px 12px 20px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <h2 style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  margin: 0,
+                  color: 'var(--text-primary)',
+                  letterSpacing: '-0.02em',
+                  flex: 1,
+                }}>{exData.name || longPressExercise}</h2>
+                <button
+                  onClick={() => { setLongPressExercise(null); setPreviewExpanded(false); previewExpandedRef.current = false; }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-tertiary)',
+                    padding: 8,
+                    margin: -8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 36,
+                    minHeight: 36,
+                  }}
+                  aria-label="Close modal"
+                >
+                  <X size={20} strokeWidth={2.2} />
+                </button>
+              </div>
+
+              <p className="muscle-preview-modal__muscles" style={{ textAlign: 'center', marginBottom: 16 }}>{exData.muscle || ''}</p>
+
+              <div className="muscle-preview-modal__maps">
+                <MuscleMap
+                  exerciseIds={[longPressExercise]}
+                  view="front"
+                  size="lg"
+                />
+                <MuscleMap
+                  exerciseIds={[longPressExercise]}
+                  view="back"
+                  size="lg"
+                />
+              </div>
+              {exData.formTips && exData.formTips.length > 0 && (
+                <div className="muscle-preview-modal__section">
+                  <h4 className="muscle-preview-modal__section-title">Form Tips</h4>
+                  <ul className="muscle-preview-modal__tips">
+                    {exData.formTips.map((tip, i) => <li key={i}>{tip}</li>)}
+                  </ul>
+                </div>
+              )}
+              {exData.warnings && exData.warnings.length > 0 && (
+                <div className="muscle-preview-modal__section">
+                  <h4 className="muscle-preview-modal__section-title">Warnings</h4>
+                  <ul className="muscle-preview-modal__tips">
+                    {exData.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
+
       {/* Floating Done button — portaled above the blur overlay */}
-      {showCatalog && !catalogExpanded && editingSheet?.exercises?.length > 0 && createPortal(
+      {showCatalog && !catalogExpanded && !longPressExercise && editingSheet?.exercises?.length > 0 && createPortal(
         <button
           className="catalog-done-btn"
           onClick={() => { exercisesSnapshot.current = null; setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch(''); }}

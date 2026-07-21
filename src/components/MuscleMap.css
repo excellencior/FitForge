@@ -1,0 +1,226 @@
+/* ═══════════════════════════════════════════
+   MuscleMap Component Styles
+   ═══════════════════════════════════════════ */
+
+/* Container */
+.muscle-map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.muscle-map--row {
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Size variants */
+.muscle-map--sm svg { width: 64px; height: auto; }
+.muscle-map--md svg { width: 100px; height: auto; }
+.muscle-map--lg svg { width: 140px; height: auto; }
+
+/* Path styling — smooth transitions */
+.muscle-map svg path {
+  transition: fill 0.25s ease, stroke 0.25s ease;
+}
+
+/* "Full Body" label */
+.muscle-map__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ── Hero Card (Track Tab) ── */
+.muscle-hero-card {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg, 16px);
+  padding: 20px 16px 16px;
+  margin: 0 0 20px;
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  animation: muscleHeroFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.muscle-hero-card__title {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  margin: 0 0 14px;
+}
+
+.muscle-hero-card__body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.muscle-hero-card__legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.muscle-hero-card__legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+.muscle-hero-card__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+@keyframes muscleHeroFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Catalog Inline SVG ── */
+.catalog-muscle-inline {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* ── Long-Press Modal ── */
+.muscle-preview-modal__header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.muscle-preview-modal__name {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.muscle-preview-modal__muscles {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.muscle-preview-modal__maps {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.muscle-preview-modal__section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light, #ddd);
+}
+
+.muscle-preview-modal__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin: 0 0 8px;
+}
+
+.muscle-preview-modal__section-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.muscle-preview-modal__tips {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.muscle-preview-modal__tips li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding: 3px 0;
+  position: relative;
+  padding-left: 16px;
+}
+
+.muscle-preview-modal__tips li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--text-tertiary);
+  font-weight: 700;
+}
+
+/* ── Anatomy Toggle Button ── */
+.anatomy-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--shadow-sm);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.anatomy-toggle--active {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+.anatomy-toggle:not(.anatomy-toggle--active) {
+  color: var(--text-tertiary);
+}
+
+/* ── Lazy loading shimmer ── */
+.muscle-map-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 25%,
+    var(--bg-tertiary, #ebebeb) 50%,
+    var(--bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
