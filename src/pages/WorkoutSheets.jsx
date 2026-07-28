@@ -10,7 +10,7 @@ import { exercises as defaultExercises } from '../data/workouts';
 import Modal from '../components/Modal';
 import {
   Plus, Minus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
-  Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star,
+  Play, AlertTriangle, Dumbbell, RotateCcw, Zap,
   GripVertical, Sparkles, Search, Moon, PersonStanding
 } from 'lucide-react';
 import MuscleMap, { MuscleMapLazy } from '../components/MuscleMap';
@@ -76,12 +76,7 @@ if (typeof document !== 'undefined' && !document.getElementById(KEYFRAMES_ID)) {
     .sheet-chip:active {
       transform: scale(0.92);
     }
-    .modal-content::-webkit-scrollbar {
-      display: none !important;
-    }
     .modal-content {
-      scrollbar-width: none !important;
-      -ms-overflow-style: none !important;
       -webkit-user-select: none !important;
       user-select: none !important;
       -webkit-touch-callout: none !important;
@@ -663,23 +658,6 @@ export default function WorkoutSheets() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 16, color: '#0F172A', letterSpacing: '-0.01em' }}>{sheet.name}</span>
-                      {isAssignedToday && (
-                        <span 
-                          title="Assigned for Today"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: 'var(--accent-gold-light)',
-                            border: '1px solid rgba(245, 158, 11, 0.35)',
-                            borderRadius: '50%',
-                            width: 22,
-                            height: 22,
-                          }}
-                        >
-                          <Star size={12} fill="#F59E0B" color="#F59E0B" />
-                        </span>
-                      )}
                     </div>
                     <div style={{ fontSize: 12, color: '#64748B', marginTop: 4, fontWeight: 500 }}>
                       {sheet.exercises?.length || 0} exercises

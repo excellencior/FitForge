@@ -392,7 +392,6 @@ export default function Progress() {
                 const ex = exercises[exId];
                 return (
                   <div key={exId} className="glass-card" style={{
-                    borderLeft: '4px solid #0F172A',
                     borderRadius: 18,
                     padding: 16,
                   }}>

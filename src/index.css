@@ -137,7 +137,7 @@
   --transition-base: var(--duration-short) var(--ease-standard);
   --transition-slow: var(--duration-base) var(--ease-standard);
   
-  --font-family: 'Iosevka', 'Iosevka Web', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+  --font-family: 'Nunito Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   
   /* ── Layout ── */
   --nav-height: 68px;
@@ -761,10 +761,7 @@ input[type="number"]::-webkit-outer-spin-button {
   position: relative;
 }
 
-.modal-content::-webkit-scrollbar {
-  width: 0;
-  display: none;
-}
+
 
 .modal-handle {
   width: 36px;
@@ -1030,9 +1027,16 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 /* ===== SCROLLBAR ===== */
+*,
+*::before,
+*::after {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE / Edge */
+}
 ::-webkit-scrollbar {
-  width: 0;
-  display: none;
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
 }
 
 /* ===== SAFE AREA ===== */

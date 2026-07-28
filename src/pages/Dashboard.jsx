@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, 
@@ -94,13 +94,145 @@ function GymAttendanceTracker() {
 
   const totalSessions = gymDates.size;
 
+  // --- Swipe gesture for month navigation (perf-optimized for old devices) ---
+  const touchRef = useRef({ startX: 0, startY: 0, swiping: false, decided: false });
+  const dragRef = useRef(0);
+  const gridElRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [slidePhase, setSlidePhase] = useState(null); // null | 'out' | 'in-prep' | 'in'
+  const [slideDir, setSlideDir] = useState(null); // 'left' | 'right' | null
+  const swipeAreaRef = useRef(null);
+
+  const handleTouchStart = useCallback((e) => {
+    if (slidePhase) return;
+    const t = e.touches[0];
+    touchRef.current = { startX: t.clientX, startY: t.clientY, swiping: true, decided: false };
+    dragRef.current = 0;
+    // Reset grid position directly (no React state for drag offset)
+    if (gridElRef.current) {
+      gridElRef.current.style.transition = 'none';
+      gridElRef.current.style.transform = 'translate3d(0,0,0)';
+      gridElRef.current.style.opacity = '1';
+    }
+    setIsDragging(false);
+  }, [slidePhase]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!touchRef.current.swiping) return;
+    const dx = e.touches[0].clientX - touchRef.current.startX;
+    const dy = e.touches[0].clientY - touchRef.current.startY;
+
+    if (!touchRef.current.decided) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      touchRef.current.decided = true;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        touchRef.current.swiping = false;
+        dragRef.current = 0;
+        setIsDragging(false);
+        return;
+      }
+      setIsDragging(true);
+    }
+
+    e.preventDefault();
+
+    const clamped = Math.sign(dx) * Math.min(Math.abs(dx), 120);
+    const dampened = (clamped < 0 && monthOffset >= 0) ? clamped * 0.3 : clamped;
+    dragRef.current = dampened;
+
+    // Direct DOM mutation — no React re-render per frame
+    if (gridElRef.current) {
+      gridElRef.current.style.transform = `translate3d(${dampened}px,0,0)`;
+    }
+  }, [monthOffset]);
+
+  // Shared transition logic for swipe & button navigation
+  const performSlide = useCallback((dir, offsetFn) => {
+    const SLIDE_OUT_MS = 140;
+    const SLIDE_IN_MS = 160;
+    const el = gridElRef.current;
+
+    setSlideDir(dir);
+    setSlidePhase('out');
+
+    // Phase 1: slide out
+    if (el) {
+      const outX = dir === 'left' ? -60 : 60;
+      el.style.transition = `transform ${SLIDE_OUT_MS}ms cubic-bezier(0.4,0,1,1), opacity ${SLIDE_OUT_MS - 20}ms ease-out`;
+      el.style.transform = `translate3d(${outX}px,0,0)`;
+      el.style.opacity = '0';
+    }
+
+    setTimeout(() => {
+      setMonthOffset(offsetFn);
+      setSlidePhase('in-prep');
+
+      // Phase 2: reposition instantly on opposite side
+      requestAnimationFrame(() => {
+        if (el) {
+          const inStartX = dir === 'left' ? 60 : -60;
+          el.style.transition = 'none';
+          el.style.transform = `translate3d(${inStartX}px,0,0)`;
+          el.style.opacity = '0';
+        }
+
+        // Phase 3: animate in
+        requestAnimationFrame(() => {
+          setSlidePhase('in');
+          if (el) {
+            el.style.transition = `transform ${SLIDE_IN_MS}ms cubic-bezier(0,0,0.2,1), opacity ${SLIDE_IN_MS - 20}ms ease-in`;
+            el.style.transform = 'translate3d(0,0,0)';
+            el.style.opacity = '1';
+          }
+          setTimeout(() => {
+            setSlidePhase(null);
+            setSlideDir(null);
+          }, SLIDE_IN_MS);
+        });
+      });
+    }, SLIDE_OUT_MS);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchRef.current.swiping) {
+      setIsDragging(false);
+      return;
+    }
+    touchRef.current.swiping = false;
+    setIsDragging(false);
+
+    const currentDrag = dragRef.current;
+    const threshold = 40;
+
+    if (currentDrag < -threshold && monthOffset < 0) {
+      performSlide('left', p => Math.min(p + 1, 0));
+    } else if (currentDrag > threshold) {
+      performSlide('right', p => p - 1);
+    } else {
+      // Snap back with a quick spring
+      if (gridElRef.current) {
+        gridElRef.current.style.transition = 'transform 0.15s cubic-bezier(0.4,0,0.2,1)';
+        gridElRef.current.style.transform = 'translate3d(0,0,0)';
+      }
+    }
+  }, [monthOffset, performSlide]);
+
+  // Non-passive touchmove listener for preventDefault
+  useEffect(() => {
+    const el = swipeAreaRef.current;
+    if (!el) return;
+    const onMove = (e) => handleTouchMove(e);
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
+  }, [handleTouchMove]);
+
   return (
     <section style={attendanceStyles.card}>
 
       {/* Month Navigation */}
       <div style={attendanceStyles.monthNav}>
         <button 
-          onClick={() => setMonthOffset(p => p - 1)}
+          onClick={() => !slidePhase && performSlide('right', p => p - 1)}
           aria-label="Previous Month"
           style={attendanceStyles.navBtn}
         >
@@ -108,7 +240,7 @@ function GymAttendanceTracker() {
         </button>
         <span style={attendanceStyles.monthLabel}>{monthName}</span>
         <button 
-          onClick={() => setMonthOffset(p => Math.min(p + 1, 0))}
+          onClick={() => !isCurrentMonth && !slidePhase && performSlide('left', p => Math.min(p + 1, 0))}
           aria-label="Next Month"
           style={{
             ...attendanceStyles.navBtn,
@@ -120,66 +252,76 @@ function GymAttendanceTracker() {
         </button>
       </div>
 
-      {/* Day Name Headers */}
-      <div style={attendanceStyles.grid}>
-        {dayNames.map((name, i) => (
-          <div key={`h-${i}`} style={attendanceStyles.dayHeader}>{name}</div>
-        ))}
-      </div>
+      {/* Swipeable Calendar Area */}
+      <div
+        ref={swipeAreaRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{ overflow: 'hidden', touchAction: isDragging ? 'none' : 'pan-y' }}
+      >
+        <div
+          ref={gridElRef}
+          style={{
+            transform: 'translate3d(0,0,0)',
+            willChange: 'transform',
+          }}
+        >
+          {/* Day Name Headers */}
+          <div style={attendanceStyles.grid}>
+            {dayNames.map((name, i) => (
+              <div key={`h-${i}`} style={attendanceStyles.dayHeader}>{name}</div>
+            ))}
+          </div>
 
-      {/* Calendar Grid */}
-      <div style={attendanceStyles.grid}>
-        {cells.map((cell, i) => {
-          if (!cell) {
-            return <div key={`e-${i}`} style={attendanceStyles.emptyCell} />;
-          }
+          {/* Calendar Grid */}
+          <div style={attendanceStyles.grid}>
+            {cells.map((cell, i) => {
+              if (!cell) {
+                return <div key={`e-${i}`} style={attendanceStyles.emptyCell} />;
+              }
 
-          const isFuture = cell.date > todayStr;
-          const isPast = cell.date < todayStr;
-          const isDeload = isDeloadDate(cell.date);
+              const isFuture = cell.date > todayStr;
+              const isPast = cell.date < todayStr;
+              const isDeload = isDeloadDate(cell.date);
 
-          return (
-            <div
-              key={cell.date}
-              onClick={() => !isFuture && setSelectedDate(cell.date)}
-              style={{
-                ...attendanceStyles.dayCell,
-                cursor: isFuture ? 'default' : 'pointer',
-                background: cell.isToday
-                  ? 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)'
-                  : (cell.isGym && isPast)
-                    ? 'rgba(15, 23, 42, 0.06)'
-                    : 'transparent',
-                border: cell.isToday
-                  ? '1px solid rgba(255, 255, 255, 0.15)'
-                  : (cell.isGym && isPast)
-                    ? 'var(--glass-border-separator)'
-                    : '1px solid transparent',
-                borderRadius: 14,
-                opacity: isFuture ? 0.3 : 1,
-                boxShadow: cell.isToday
-                  ? '0 4px 12px -2px rgba(15, 23, 42, 0.25)'
-                  : 'none',
-                position: 'relative',
-              }}
-            >
-              <span style={{
-                fontSize: 13,
-                fontWeight: cell.isGym || cell.isToday ? '700' : '500',
-                color: cell.isToday ? '#FFFFFF' : (cell.isGym && isPast ? 'var(--text-primary)' : 'var(--text-secondary)'),
-                lineHeight: 1,
-              }}>
-                {cell.day}
-              </span>
-              {isPast && cell.isGym && !cell.isToday && (
-                <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent-mint)', marginTop: 3 }} />
-              )}
-              {cell.isToday && cell.isGym && (
-                <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent-mint)', marginTop: 3 }} />
-              )}
-            </div>
-          );
-        })}
+              return (
+                <div
+                  key={cell.date}
+                  onClick={() => !isFuture && setSelectedDate(cell.date)}
+                  style={{
+                    ...attendanceStyles.dayCell,
+                    cursor: isFuture ? 'default' : 'pointer',
+                    background: cell.isToday
+                      ? 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)'
+                      : (cell.isGym && isPast)
+                        ? 'rgba(15, 23, 42, 0.06)'
+                        : 'transparent',
+                    border: cell.isToday
+                      ? '1px solid rgba(255, 255, 255, 0.15)'
+                      : (cell.isGym && isPast)
+                        ? 'var(--glass-border-separator)'
+                        : '1px solid transparent',
+                    borderRadius: 14,
+                    opacity: isFuture ? 0.3 : 1,
+                    boxShadow: cell.isToday
+                      ? '0 4px 12px -2px rgba(15, 23, 42, 0.25)'
+                      : 'none',
+                    position: 'relative',
+                  }}
+                >
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: cell.isGym || cell.isToday ? '700' : '500',
+                    color: cell.isToday ? '#FFFFFF' : (cell.isGym && isPast ? 'var(--text-primary)' : 'var(--text-secondary)'),
+                    lineHeight: 1,
+                  }}>
+                    {cell.day}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Workout Detail Modal */}
@@ -244,15 +386,43 @@ function GymAttendanceTracker() {
                 </div>
               )}
               {Object.entries(exerciseSets).map(([exId, { sets }], i, arr) => (
-                <div key={exId} style={{
+              <div key={exId} style={{
                   padding: '12px 0',
                   borderBottom: i < arr.length - 1 ? '1px solid var(--border-light)' : 'none',
                 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
                     {getExName(exId)}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
-                    {sets.length} sets × {sets[0]?.reps || 0} reps
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
+                    <span style={{ 
+                      fontSize: 11, 
+                      color: 'var(--text-primary)', 
+                      padding: '3px 10px',
+                      border: 'var(--glass-border-strong)',
+                      borderRadius: 10,
+                      fontWeight: 700,
+                      background: 'var(--glass-bg)',
+                      lineHeight: '16px',
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
+                    }}>
+                      {sets.length} sets
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 700 }}>×</span>
+                    <span style={{ 
+                      fontSize: 11, 
+                      color: 'var(--text-primary)', 
+                      padding: '3px 10px',
+                      border: 'var(--glass-border-strong)',
+                      borderRadius: 10,
+                      fontWeight: 700,
+                      background: 'var(--glass-bg)',
+                      lineHeight: '16px',
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
+                    }}>
+                      {sets[0]?.reps || 0} reps
+                    </span>
                   </div>
                 </div>
               ))}
