@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement,
@@ -7,7 +7,7 @@ import {
 import { getBodyStats, getPRRecords, getSettings } from '../utils/storage';
 import { exercises as rawExercises } from '../data/workouts';
 import {
-  Scale, Trophy, Dumbbell, Ruler, Heart
+  Scale, Trophy, Heart
 } from 'lucide-react';
 
 const legacyExerciseMap = {
@@ -63,7 +63,7 @@ const exercises = new Proxy(rawExercises, {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
-const fontFamily = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const fontFamily = "Iosevka, Iosevka Web, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, monospace";
 
 const getThemeColor = (varName, fallback) => {
   const vars = {
@@ -96,6 +96,37 @@ export default function Progress() {
     return { bmi: bmiVal, status: bmiStatus, color: bmiColor, percent: bmiPercent };
   }, [settings]);
 
+  const weightChartData = useMemo(() => {
+    const sorted = [...bodyStats].sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+    const weights = sorted.map(s => s.weight);
+    return {
+      labels: sorted.map(s => { const d = new Date(s.date + 'T00:00:00'); return `${d.getDate()}/${d.getMonth() + 1}`; }),
+      datasets: [{
+        data: weights,
+        borderColor: '#222222',
+        backgroundColor: (ctx) => {
+          const chart = ctx.chart;
+          const { ctx: canvasCtx, chartArea } = chart;
+          if (!chartArea) return 'rgba(34,34,34,0.08)';
+          const gradient = canvasCtx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(34,34,34,0.15)');
+          gradient.addColorStop(0.6, 'rgba(34,34,34,0.05)');
+          gradient.addColorStop(1, 'rgba(34,34,34,0)');
+          return gradient;
+        },
+        fill: true,
+        borderWidth: 2.5,
+        pointRadius: weights.length <= 10 ? 5 : weights.length <= 20 ? 3.5 : 2,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#FFFFFF',
+        pointBorderColor: '#222222',
+        pointBorderWidth: 2.5,
+        pointHitRadius: 12,
+        tension: 0.3,
+      }],
+    };
+  }, [bodyStats]);
+
   const themeChartOptions = useMemo(() => {
     const textTertiary = getThemeColor('--text-tertiary', '#999999');
     const textSecondary = getThemeColor('--text-secondary', '#555555');
@@ -103,6 +134,26 @@ export default function Progress() {
     const bgCard = getThemeColor('--bg-card', '#FFFFFF');
     const textPrimary = getThemeColor('--text-primary', '#111111');
     const border = getThemeColor('--border', '#222222');
+
+    // Compute padded Y-axis bounds
+    const sorted = [...bodyStats].sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+    const weights = sorted.map(s => s.weight).filter(w => w > 0);
+    let yMin, yMax;
+    if (weights.length > 0) {
+      const dataMin = Math.min(...weights);
+      const dataMax = Math.max(...weights);
+      const range = dataMax - dataMin;
+      // Pad by at least 2kg or 5% of range, whichever is larger
+      const pad = Math.max(2, range * 0.25);
+      yMin = Math.floor((dataMin - pad) * 2) / 2; // round to 0.5
+      yMax = Math.ceil((dataMax + pad) * 2) / 2;
+      // Ensure we have at least a 4kg visible range
+      if (yMax - yMin < 4) {
+        const mid = (dataMin + dataMax) / 2;
+        yMin = Math.floor((mid - 2) * 2) / 2;
+        yMax = Math.ceil((mid + 2) * 2) / 2;
+      }
+    }
 
     return {
       responsive: true,
@@ -115,100 +166,126 @@ export default function Progress() {
           bodyColor: textPrimary,
           borderColor: border,
           borderWidth: 2,
-          titleFont: { family: fontFamily, weight: '600' },
-          bodyFont: { family: fontFamily },
+          titleFont: { family: fontFamily, weight: '600', size: 11 },
+          bodyFont: { family: fontFamily, weight: '700', size: 13 },
           cornerRadius: 0,
           padding: 12,
+          displayColors: false,
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y} kg`,
+          }
         }
       },
       scales: {
         x: {
           grid: { display: false },
           border: { display: false },
-          ticks: { font: { size: 10, family: fontFamily }, color: textTertiary }
+          ticks: {
+            font: { size: 10, family: fontFamily, weight: '500' },
+            color: textTertiary,
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8,
+          }
         },
         y: {
+          min: yMin,
+          max: yMax,
           grid: { color: bgTertiary, drawTicks: false },
           border: { display: false },
-          ticks: { font: { size: 10, family: fontFamily }, color: textSecondary },
-          beginAtZero: false
+          ticks: {
+            font: { size: 10, family: fontFamily, weight: '600' },
+            color: textSecondary,
+            callback: (v) => `${v}`,
+            maxTicksLimit: 6,
+            padding: 8,
+          },
         },
       },
       elements: {
-        line: { tension: 0, borderWidth: 2 },
-        point: { radius: 0, hoverRadius: 5, backgroundColor: '#222222' }
+        line: { tension: 0.3, borderWidth: 2.5 },
+        point: { radius: 4, hoverRadius: 7, backgroundColor: '#FFFFFF', borderColor: '#222222', borderWidth: 2.5 }
       },
-    };
-  }, []);
-
-
-
-  const weightChartData = useMemo(() => {
-    const sorted = [...bodyStats].sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
-    return {
-      labels: sorted.map(s => { const d = new Date(s.date); return `${d.getDate()}/${d.getMonth() + 1}`; }),
-      datasets: [{
-        data: sorted.map(s => s.weight),
-        borderColor: '#222222',
-        backgroundColor: 'rgba(34,34,34,0.1)',
-        fill: true,
-      }],
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false,
+      },
     };
   }, [bodyStats]);
 
   const latestBody = bodyStats.length > 0 ? bodyStats[bodyStats.length - 1] : null;
 
+  // Weight stats summary
+  const weightStats = useMemo(() => {
+    const sorted = [...bodyStats].sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+    const weights = sorted.map(s => s.weight).filter(w => w > 0);
+    if (weights.length < 2) return null;
+    const first = weights[0];
+    const last = weights[weights.length - 1];
+    const diff = last - first;
+    return {
+      change: diff.toFixed(1),
+      isGain: diff > 0,
+      isLoss: diff < 0,
+      entries: weights.length,
+    };
+  }, [bodyStats]);
 
+
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+  }, []);
 
   return (
     <div className="page-content" style={{
       paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)',
     }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+      <div style={{ marginBottom: 24, paddingTop: 4 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: '#0F172A', margin: 0, lineHeight: 1.2 }}>
           Progress
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--text-tertiary)', marginTop: 4 }}>Track your gains</p>
+        <p style={{ fontSize: 13, color: '#475569', marginTop: 4, fontWeight: 600 }}>Track your gains</p>
       </div>
 
       <div>
         {/* BMI Calculator Card */}
         <div 
-          className="card" 
+          className="glass-card" 
           style={{ 
-            background: 'var(--bg-card)', 
-            border: '2px solid var(--border)', 
-            boxShadow: 'var(--shadow-md)', 
-            borderRadius: 0, 
+            borderRadius: 20, 
             padding: 20, 
             marginBottom: 20 
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Heart size={18} color="var(--text-primary)" strokeWidth={2.5} />
+            <Heart size={18} color="#0F172A" strokeWidth={2.5} />
             <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>BMI Calculator</span>
           </div>
 
-          <div style={{ background: 'var(--bg-tertiary)', padding: '16px 20px', borderRadius: 0, border: '2px solid var(--border)', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: 'var(--glass-bg)', padding: '16px 20px', borderRadius: 16, border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow), var(--glass-rim)', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>Body Mass Index</span>
               <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{bmiCalc.bmi}</span>
             </div>
 
             {/* Progress bar */}
-            <div style={{ height: 6, background: 'var(--border-light)', borderRadius: 0, position: 'relative', overflow: 'visible', margin: '4px 0', border: '1px solid var(--border)' }}>
+            <div style={{ height: 6, background: 'rgba(241, 245, 249, 0.8)', borderRadius: 99, position: 'relative', overflow: 'visible', margin: '4px 0', border: 'var(--glass-border-separator)' }}>
               <div 
                 style={{ 
                   position: 'absolute', 
                   left: `${bmiCalc.percent}%`, 
                   top: -4, 
-                  width: 12, 
-                  height: 12, 
-                  borderRadius: 0, 
+                  width: 14, 
+                  height: 14, 
+                  borderRadius: '50%', 
                   background: bmiCalc.color, 
-                  border: '2px solid var(--border)', 
-                  boxShadow: 'var(--shadow-sm)',
+                  border: '2px solid #FFFFFF', 
+                  boxShadow: 'var(--glass-shadow-sm)',
                   transform: 'translateX(-50%)',
                   transition: 'left 0.3s ease'
                 }} 
@@ -225,67 +302,43 @@ export default function Progress() {
 
         {/* Latest Measurements */}
         {latestBody && (
-          <div className="card" style={{
-            background: 'var(--bg-card)',
-            border: '2px solid var(--border)',
-            borderRadius: 0,
+          <div className="glass-card" style={{
+            borderRadius: 20,
             padding: 16,
             marginBottom: 20,
-            boxShadow: 'var(--shadow-md)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Latest Measurements</span>
               <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{latestBody.date}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                { label: 'Weight', value: `${latestBody.weight} kg`, icon: <Scale size={16} strokeWidth={2.4} color="var(--text-primary)" /> },
-                { label: 'Waist', value: latestBody.waist ? `${latestBody.waist} cm` : '—', icon: <Ruler size={16} strokeWidth={2.4} color="var(--text-primary)" /> },
-                { label: 'Chest', value: latestBody.chest ? `${latestBody.chest} cm` : '—', icon: <Dumbbell size={16} strokeWidth={2.4} color="var(--text-primary)" /> },
-                { label: 'Arm', value: latestBody.arm ? `${latestBody.arm} cm` : '—', icon: <Dumbbell size={16} strokeWidth={2.4} color="var(--text-primary)" /> },
-              ].map((s, i) => (
-                <div key={i} style={{
-                  padding: 14,
-                  background: 'var(--bg-tertiary)',
-                  border: '2px solid var(--border)',
-                  boxShadow: 'var(--shadow-sm)',
-                  borderRadius: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textAlign: 'center'
-                }}>
-                  <div style={{
-                    background: 'var(--bg-card)',
-                    border: '2px solid var(--border)',
-                    borderRadius: 0,
-                    width: 28,
-                    height: 28,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 8
-                  }}>
-                    {s.icon}
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4, fontWeight: '500' }}>{s.label}</div>
-                </div>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                background: 'var(--bg-tertiary)',
+                border: '2px solid var(--border)',
+                borderRadius: 0,
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Scale size={18} strokeWidth={2.4} color="var(--text-primary)" />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: '500', marginBottom: 2 }}>Weight</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{latestBody.weight} kg</div>
+              </div>
             </div>
           </div>
         )}
 
         {/* Weight Trend Chart */}
         {bodyStats.length >= 2 ? (
-          <div className="card" style={{
-            background: 'var(--bg-card)',
-            border: '2px solid var(--border)',
-            borderRadius: 0,
+          <div className="glass-card" style={{
+            borderRadius: 20,
             padding: 16,
             marginBottom: 20,
-            boxShadow: 'var(--shadow-md)'
           }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Weight Trend</div>
             <div style={{ height: 180 }} aria-label="Weight trend chart">
@@ -293,27 +346,24 @@ export default function Progress() {
             </div>
           </div>
         ) : (
-          <div className="card" style={{
-            background: 'var(--bg-card)',
-            border: '2px solid var(--border)',
-            borderRadius: 0,
+          <div className="glass-card" style={{
+            borderRadius: 20,
             padding: '32px 24px',
             marginBottom: 20,
             textAlign: 'center',
-            boxShadow: 'var(--shadow-md)'
           }}>
             <div style={{
-              background: 'var(--bg-tertiary)',
-              border: '2px solid var(--border)',
+              background: 'rgba(124, 92, 255, 0.12)',
+              border: 'var(--glass-border-strong)',
               width: 48,
               height: 48,
-              borderRadius: 0,
+              borderRadius: 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 16px'
             }}>
-              <Scale size={22} strokeWidth={2.2} color="var(--text-tertiary)" />
+              <Scale size={22} strokeWidth={2.2} color="#7C5CFF" />
             </div>
             <div style={{ fontSize: 14, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>Log at least 2 body measurements to see your weight trend</div>
           </div>
@@ -341,28 +391,25 @@ export default function Progress() {
               {Object.entries(prs).map(([exId, pr]) => {
                 const ex = exercises[exId];
                 return (
-                  <div key={exId} style={{
-                    background: 'var(--bg-card)',
-                    border: '2px solid var(--border)',
-                    borderLeft: '5px solid #333333',
-                    borderRadius: 0,
+                  <div key={exId} className="glass-card" style={{
+                    borderLeft: '4px solid #0F172A',
+                    borderRadius: 18,
                     padding: 16,
-                    boxShadow: 'var(--shadow-sm)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                         <div style={{
-                          background: 'var(--bg-tertiary)',
-                          border: '2px solid var(--border)',
-                          borderRadius: 0,
-                          width: 32,
-                          height: 32,
+                          background: 'rgba(15, 23, 42, 0.08)',
+                          border: 'var(--glass-border-strong)',
+                          borderRadius: 12,
+                          width: 36,
+                          height: 36,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           flexShrink: 0
                         }}>
-                          <Trophy size={16} strokeWidth={2.4} color="#333333" />
+                          <Trophy size={16} strokeWidth={2.4} color="#0F172A" />
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

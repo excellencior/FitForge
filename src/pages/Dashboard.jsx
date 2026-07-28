@@ -7,7 +7,6 @@ import {
   ChevronLeft, 
   Dumbbell, 
   Coffee,
-  Check,
   Moon
 } from 'lucide-react';
 import { 
@@ -21,6 +20,8 @@ import {
 } from '../utils/storage';
 import { exercises as defaultExercises } from '../data/workouts';
 import Modal from '../components/Modal';
+import { useLottie } from 'lottie-react';
+import checkAnimationData from '../assets/check-animation.json';
 import logo from '../assets/fitforge_logo.png';
 
 function getGreeting() {
@@ -72,9 +73,9 @@ function GymAttendanceTracker() {
   // Build calendar grid
   const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startOffset = (firstDay + 6) % 7;
+  const startOffset = firstDay;
 
-  const dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const cells = [];
@@ -143,34 +144,38 @@ function GymAttendanceTracker() {
               onClick={() => !isFuture && setSelectedDate(cell.date)}
               style={{
                 ...attendanceStyles.dayCell,
-                flexDirection: 'column',
-                gap: 1,
                 cursor: isFuture ? 'default' : 'pointer',
-                background: cell.isGym ? '#222222' : (isPast && cell.isRestDay ? 'var(--bg-secondary)' : 'transparent'),
+                background: cell.isToday
+                  ? 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)'
+                  : (cell.isGym && isPast)
+                    ? 'rgba(15, 23, 42, 0.06)'
+                    : 'transparent',
                 border: cell.isToday
-                  ? `2px solid #222222`
-                  : (isPast && cell.isRestDay ? '2px solid var(--border)' : (isDeload && !cell.isGym ? '2px dashed #CCCCCC' : '2px solid transparent')),
-                opacity: isFuture ? 0.25 : 1,
-                boxShadow: cell.isGym ? 'var(--shadow-sm)' : 'none',
-                position: 'relative'
+                  ? '1px solid rgba(255, 255, 255, 0.15)'
+                  : (cell.isGym && isPast)
+                    ? 'var(--glass-border-separator)'
+                    : '1px solid transparent',
+                borderRadius: 14,
+                opacity: isFuture ? 0.3 : 1,
+                boxShadow: cell.isToday
+                  ? '0 4px 12px -2px rgba(15, 23, 42, 0.25)'
+                  : 'none',
+                position: 'relative',
               }}
             >
-              {isPast && cell.isGym && (
-                <Dumbbell size={11} strokeWidth={2.5} color="#FFFFFF" style={{ marginBottom: -1 }} />
-              )}
-              {isPast && !cell.isGym && cell.isRestDay && (
-                <Moon size={10} strokeWidth={2.2} color="var(--text-tertiary)" style={{ marginBottom: -1 }} />
-              )}
               <span style={{
-                fontSize: (isPast && (cell.isGym || cell.isRestDay)) ? 11 : 14,
-                fontWeight: cell.isGym || cell.isToday ? '800' : '600',
-                color: cell.isGym ? '#FFFFFF' : (cell.isToday ? 'var(--text-primary)' : (isPast && cell.isRestDay ? 'var(--text-tertiary)' : (isDeload && !cell.isGym ? '#999999' : 'var(--text-secondary)'))),
+                fontSize: 13,
+                fontWeight: cell.isGym || cell.isToday ? '700' : '500',
+                color: cell.isToday ? '#FFFFFF' : (cell.isGym && isPast ? 'var(--text-primary)' : 'var(--text-secondary)'),
                 lineHeight: 1,
               }}>
                 {cell.day}
               </span>
-              {isDeload && cell.isGym && (
-                <div style={{ position: 'absolute', bottom: 3, width: 4, height: 4, borderRadius: '50%', background: '#CCCCCC' }} />
+              {isPast && cell.isGym && !cell.isToday && (
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent-mint)', marginTop: 3 }} />
+              )}
+              {cell.isToday && cell.isGym && (
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent-mint)', marginTop: 3 }} />
               )}
             </div>
           );
@@ -262,12 +267,13 @@ function GymAttendanceTracker() {
 
 const attendanceStyles = {
   card: {
-    background: 'var(--bg-card)',
-    borderRadius: 18,
+    background: 'var(--glass-bg)',
+    backdropFilter: 'blur(40px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+    borderRadius: 22,
     padding: 20,
-    marginBottom: 20,
-    border: '2px solid var(--border)',
-    boxShadow: 'var(--shadow-md)',
+    border: 'var(--glass-border)',
+    boxShadow: 'var(--glass-shadow), var(--glass-rim)',
   },
   header: {
     display: 'flex',
@@ -278,7 +284,7 @@ const attendanceStyles = {
   title: {
     fontSize: 13,
     fontWeight: '700',
-    color: 'var(--text-tertiary)',
+    color: 'var(--text-secondary)',
     margin: 0,
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
@@ -290,12 +296,14 @@ const attendanceStyles = {
     marginBottom: 16,
   },
   navBtn: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: '50%',
-    border: '2px solid var(--border)',
-    boxShadow: 'var(--shadow-sm)',
-    background: 'var(--bg-secondary)',
+    border: 'var(--glass-border-subtle)',
+    boxShadow: 'var(--glass-shadow-sm), var(--glass-rim)',
+    background: 'var(--glass-bg)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -313,14 +321,13 @@ const attendanceStyles = {
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)',
-    gap: 4,
+    gap: 5,
   },
   dayHeader: {
     textAlign: 'center',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     color: 'var(--text-tertiary)',
-    textTransform: 'uppercase',
     letterSpacing: '0.04em',
     paddingBottom: 8,
   },
@@ -329,10 +336,12 @@ const attendanceStyles = {
   },
   dayCell: {
     aspectRatio: '1',
-    borderRadius: 10,
+    borderRadius: 14,
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 0,
     transition: 'all 0.2s ease',
   },
   footer: {
@@ -342,7 +351,7 @@ const attendanceStyles = {
     gap: 20,
     marginTop: 16,
     paddingTop: 14,
-    borderTop: '2px solid var(--border)',
+    borderTop: 'var(--glass-border-separator)',
   },
   footerStat: {
     display: 'flex',
@@ -367,6 +376,19 @@ const attendanceStyles = {
     background: 'var(--border)',
   },
 };
+
+function CheckAnimation() {
+  const { View } = useLottie({
+    animationData: checkAnimationData,
+    loop: true,
+    autoplay: true,
+  });
+  return (
+    <div style={{ width: 44, height: 44, flexShrink: 0 }}>
+      {View}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -424,16 +446,16 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', height: 40 }}>
             <span style={{
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 800,
-              color: '#ffffff',
-              background: isRestDay ? '#166534' : '#1e40af',
-              border: 'none',
+              color: '#0F172A',
+              background: 'rgba(15, 23, 42, 0.08)',
+              border: 'var(--glass-border-strong)',
               borderRadius: 100,
-              padding: '1px 10px',
+              padding: '2px 10px',
               textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              lineHeight: 1.3,
+              letterSpacing: '0.06em',
+              lineHeight: 1.2,
               width: 'fit-content',
             }}>
               {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
@@ -441,11 +463,11 @@ export default function Dashboard() {
             <span style={{
               fontSize: 11,
               fontWeight: 700,
-              color: 'var(--text-tertiary)',
-              letterSpacing: '0.02em',
+              color: 'var(--text-secondary)',
+              letterSpacing: '0.04em',
               textTransform: 'uppercase',
-              paddingLeft: 11,
-              lineHeight: 1,
+              paddingLeft: 10,
+              lineHeight: 1.2,
             }}>
               {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
             </span>
@@ -457,7 +479,7 @@ export default function Dashboard() {
             aria-label={`Total workout days: ${totalDays}`}
             style={styles.daysBadge}
           >
-            <CalendarCheck size={16} color="#333333" strokeWidth={2.2} />
+            <CalendarCheck size={16} color="#0F172A" strokeWidth={2.2} />
             <span style={{ fontSize: 13, fontWeight: '700', color: 'var(--text-primary)' }}>
               {totalDays} {totalDays === 1 ? 'day' : 'days'}
             </span>
@@ -494,22 +516,25 @@ export default function Dashboard() {
         style={{
           ...styles.workoutPillCard,
           cursor: (workoutDone || isRestDay) ? 'default' : 'pointer',
-          ...(workoutDone ? { background: '#f0fdf4', border: '2px solid #86efac', boxShadow: '0 0 0 1px rgba(34,197,94,0.1)' } : {}),
+          ...(workoutDone ? {
+            background: 'var(--glass-green-bg)',
+            border: 'var(--glass-green-border)',
+            boxShadow: 'var(--glass-green-shadow), var(--glass-rim)',
+          } : {}),
         }}
       >
         <div style={styles.workoutPillContent}>
-          <div style={{
-            ...styles.workoutPillIconWrap,
-            ...(workoutDone ? { background: '#22c55e', border: '2px solid #16a34a', borderRadius: '50%' } : {}),
-          }}>
-            {isRestDay ? (
-              <Coffee size={18} strokeWidth={2.2} color="var(--text-secondary)" />
-            ) : workoutDone ? (
-              <Check size={20} strokeWidth={3} color="#FFFFFF" />
-            ) : (
-              <Dumbbell size={18} strokeWidth={2.2} color="var(--text-primary)" />
-            )}
-          </div>
+          {workoutDone ? (
+            <CheckAnimation />
+          ) : (
+            <div style={styles.workoutPillIconWrap}>
+              {isRestDay ? (
+                <Coffee size={18} strokeWidth={2.2} color="var(--text-secondary)" />
+              ) : (
+                <Dumbbell size={18} strokeWidth={2.2} color="var(--text-primary)" />
+              )}
+            </div>
+          )}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {isRestDay && (
               <span style={styles.workoutPillSub}>Recovery</span>
@@ -581,7 +606,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'var(--bg-card)',
+    background: 'var(--glass-bg)',
   },
   logoImage: {
     width: '100%',
@@ -595,35 +620,39 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    background: 'var(--bg-card)',
+    background: 'var(--glass-bg)',
     borderRadius: 14,
     padding: '4px 12px 4px 6px',
-    border: '2px solid var(--border)',
-    boxShadow: 'var(--shadow-sm)',
+    border: 'var(--glass-border)',
+    boxShadow: 'var(--glass-shadow-sm), var(--glass-rim)',
   },
   settingsBtn: {
     width: 44,
     height: 44,
     borderRadius: '50%',
-    background: 'var(--bg-card)',
-    border: '2px solid var(--border)',
+    background: 'var(--glass-bg-elevated)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: 'var(--glass-border)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    boxShadow: 'var(--shadow-sm)',
+    boxShadow: 'var(--glass-shadow), var(--glass-rim)',
     WebkitTapHighlightColor: 'transparent',
     transition: 'background-color 0.2s ease',
   },
   
   // Today Workout Pill
   workoutPillCard: {
-    background: 'var(--bg-card)',
-    borderRadius: 18,
-    padding: 16,
+    background: 'var(--glass-bg)',
+    backdropFilter: 'blur(40px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+    borderRadius: 22,
+    padding: 18,
     marginBottom: 20,
-    border: '2px solid var(--border)',
-    boxShadow: 'var(--shadow-md)',
+    border: 'var(--glass-border)',
+    boxShadow: 'var(--glass-shadow), var(--glass-rim)',
     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
     userSelect: 'none',
     WebkitTapHighlightColor: 'transparent',
@@ -636,9 +665,11 @@ const styles = {
   workoutPillIconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 12,
-    background: 'var(--bg-tertiary)',
-    border: '2px solid var(--border)',
+    borderRadius: 14,
+    background: 'var(--glass-bg-tint)',
+    border: 'var(--glass-border-subtle)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -666,13 +697,15 @@ const styles = {
     fontWeight: '500',
   },
   workoutPillDoneBadge: {
-    background: 'var(--bg-tertiary)',
-    border: '2px solid var(--border)',
+    background: 'var(--glass-bg)',
+    border: 'var(--glass-border-subtle)',
     borderRadius: 20,
     padding: '6px 12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
   },
   workoutPillDoneText: {
     fontSize: 12,
@@ -680,9 +713,9 @@ const styles = {
     color: 'var(--text-primary)',
   },
   workoutPillStartBadge: {
-    background: 'var(--bg-secondary)',
+    background: 'var(--glass-bg)',
     color: 'var(--text-primary)',
-    border: '2px solid var(--border)',
+    border: 'var(--glass-border-subtle)',
     boxShadow: 'var(--shadow-sm)',
     borderRadius: 20,
     padding: '6px 12px',
@@ -691,6 +724,8 @@ const styles = {
     gap: 2,
     fontSize: 13,
     fontWeight: '700',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
   },
 };
 

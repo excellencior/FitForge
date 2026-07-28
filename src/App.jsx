@@ -39,8 +39,19 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  const activeIndex = navItems.findIndex(item => 
+    item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+  );
+
   return (
     <div className="app-container">
+      {/* Ambient Canvas Background Mesh */}
+      <div className="ambient-mesh-bg" aria-hidden="true">
+        <div className="glow-blob glow-blob-1" />
+        <div className="glow-blob glow-blob-2" />
+        <div className="glow-blob glow-blob-3" />
+      </div>
+
       <div key={location.pathname} className="route-transition-wrapper">
         <Suspense fallback={<LoadingSpinner />}>
           <Routes location={location}>
@@ -55,6 +66,14 @@ export default function App() {
       </div>
 
       <nav className="bottom-nav">
+        {activeIndex !== -1 && (
+          <div 
+            className="nav-active-pill"
+            style={{
+              transform: `translateX(${activeIndex * 100}%)`,
+            }}
+          />
+        )}
         {navItems.map(({ path, icon: Icon, label }) => (
           <NavLink
             key={path}

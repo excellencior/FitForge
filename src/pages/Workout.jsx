@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, Dumbbell, Moon, Scale } from 'lucide-react';
+import { Check, Dumbbell, Moon, Scale, Pencil } from 'lucide-react';
 import { exercises as rawExercises, workoutTemplates } from '../data/workouts';
 
 const legacyExerciseMap = {
@@ -51,7 +51,7 @@ const exercises = new Proxy(rawExercises, {
   }
 });
 
-import { getTodayWorkoutType, saveWorkoutLog, removeWorkoutLogByExercise, updatePR, getToday, getPRRecords, getTodayRoutine, saveBodyStat, getWorkoutsByDate } from '../utils/storage';
+import { getTodayWorkoutType, saveWorkoutLog, removeWorkoutLogByExercise, updatePR, getToday, getPRRecords, getTodayRoutine, saveBodyStat, getWorkoutsByDate, getBodyStats } from '../utils/storage';
 import Modal from '../components/Modal';
 import MuscleMap from '../components/MuscleMap';
 import { muscleMappings } from '../data/muscleMappings';
@@ -69,6 +69,20 @@ function Workout() {
   const confettiTimerRef = useRef(null);
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [weightInput, setWeightInput] = useState('');
+  const [weightLogged, setWeightLogged] = useState(false);
+  const [todayWeight, setTodayWeight] = useState(null);
+  const [showWeightInfoModal, setShowWeightInfoModal] = useState(false);
+
+  // Check if weight is already logged for today
+  useEffect(() => {
+    const today = getToday();
+    const stats = getBodyStats();
+    const todayStat = stats.find(s => s.date === today);
+    if (todayStat && todayStat.weight) {
+      setWeightLogged(true);
+      setTodayWeight(todayStat.weight);
+    }
+  }, []);
 
   // Confetti burst — spawns particles from the checkbox position
   const spawnConfetti = (evt) => {
@@ -210,17 +224,27 @@ function Workout() {
         <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', margin: '20px 0 8px', letterSpacing: '-0.03em' }}>Rest Day</h1>
         <p style={{ fontSize: 14, color: 'var(--text-tertiary)', textAlign: 'center', maxWidth: 260, lineHeight: 1.5 }}>Get 7–9 hours of sleep, stay hydrated, and let your muscles recover.</p>
         <button
-          onClick={() => { setWeightInput(''); setShowWeightModal(true); }}
+          onClick={() => {
+            if (weightLogged) {
+              setShowWeightInfoModal(true);
+            } else {
+              setWeightInput(''); setShowWeightModal(true);
+            }
+          }}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '8px 16px', borderRadius: 10, marginTop: 16,
-            border: '1.5px solid var(--border)', background: 'var(--bg-card)',
-            cursor: 'pointer', boxShadow: 'var(--shadow-sm)',
-            color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600
+            border: weightLogged ? '2px solid var(--accent-mint)' : '1.5px solid var(--border)',
+            background: weightLogged ? 'var(--accent-mint)' : 'var(--glass-bg)',
+            cursor: 'pointer',
+            boxShadow: weightLogged ? 'var(--glass-green-shadow)' : 'var(--shadow-sm)',
+            color: weightLogged ? '#fff' : 'var(--text-secondary)',
+            fontSize: 13, fontWeight: 600,
+            transition: 'all 0.25s ease',
           }}
         >
-          <Scale size={14} strokeWidth={2.2} />
-          Log Wt.
+          {weightLogged ? <Check size={14} strokeWidth={3} /> : <Scale size={14} strokeWidth={2.2} />}
+          {weightLogged ? 'Wt. Logged' : 'Log Wt.'}
         </button>
 
         <Modal isOpen={showWeightModal} onClose={() => setShowWeightModal(false)} type="centered-alert">
@@ -243,21 +267,56 @@ function Workout() {
             />
             <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6, fontWeight: 600 }}>kg</span>
             <button
+              disabled={!weightInput || parseFloat(weightInput) <= 0}
               onClick={() => {
                 const w = parseFloat(weightInput);
                 if (w > 0) {
                   saveBodyStat({ date: getToday(), weight: w });
+                  setWeightLogged(true);
+                  setTodayWeight(w);
                   setShowWeightModal(false);
                 }
               }}
               className="btn btn-primary"
               style={{
-                width: '100%', padding: '12px', marginTop: 16, borderRadius: 12,
-                border: '2px solid var(--border)', background: 'var(--text-primary)',
-                color: '#FFFFFF', fontSize: 14, fontWeight: 700, cursor: 'pointer'
+                width: '100%', padding: '12px', marginTop: 16, borderRadius: 14,
+                border: 'none', fontSize: 14, fontWeight: 700,
               }}
             >
               Save
+            </button>
+          </div>
+        </Modal>
+
+        <Modal isOpen={showWeightInfoModal} onClose={() => setShowWeightInfoModal(false)} type="centered-alert">
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: 'var(--accent-mint)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+              boxShadow: 'var(--glass-green-shadow)',
+            }}>
+              <Check size={24} strokeWidth={3} color="#fff" />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-green)', fontWeight: 600, marginBottom: 4 }}>Today's Weight</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>{todayWeight} <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)' }}>kg</span></div>
+            <button
+              onClick={() => {
+                setShowWeightInfoModal(false);
+                setWeightInput(String(todayWeight));
+                setShowWeightModal(true);
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                width: '100%', padding: '10px', marginTop: 20, borderRadius: 10,
+                border: '1.5px solid var(--border)', background: 'var(--bg-tertiary)',
+                cursor: 'pointer', color: 'var(--text-primary)',
+                fontSize: 13, fontWeight: 600,
+              }}
+            >
+              <Pencil size={13} strokeWidth={2.5} />
+              Edit Weight
             </button>
           </div>
         </Modal>
@@ -270,7 +329,6 @@ function Workout() {
       className="page-content workout-page"
       style={{
         paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)',
-        background: 'var(--bg-secondary)',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -279,7 +337,7 @@ function Workout() {
     >
       <div style={{ textAlign: 'center', padding: '16px 0 20px' }}>
         <h1 style={{ fontSize: 24, fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: '-0.02em' }}>{template.name}</h1>
-        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0, fontWeight: '500' }}>{todayFormatted()}</p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, fontWeight: '600' }}>{todayFormatted()}</p>
       </div>
 
       {/* Muscle Map Hero Card */}
@@ -349,18 +407,20 @@ function Workout() {
           />
           <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6, fontWeight: 600 }}>kg</span>
           <button
+            disabled={!weightInput || parseFloat(weightInput) <= 0}
             onClick={() => {
               const w = parseFloat(weightInput);
               if (w > 0) {
                 saveBodyStat({ date: getToday(), weight: w });
+                setWeightLogged(true);
+                setTodayWeight(w);
                 setShowWeightModal(false);
               }
             }}
             className="btn btn-primary"
             style={{
-              width: '100%', padding: '12px', marginTop: 16, borderRadius: 12,
-              border: '2px solid var(--border)', background: 'var(--text-primary)',
-              color: '#FFFFFF', fontSize: 14, fontWeight: 700, cursor: 'pointer'
+              width: '100%', padding: '12px', marginTop: 16, borderRadius: 14,
+              border: 'none', fontSize: 14, fontWeight: 700,
             }}
           >
             Save
@@ -379,18 +439,30 @@ function Workout() {
             </span>
           </div>
           <button
-            onClick={() => { setWeightInput(''); setShowWeightModal(true); }}
+            onClick={() => {
+              if (weightLogged) {
+                setShowWeightInfoModal(true);
+              } else {
+                setWeightInput(''); setShowWeightModal(true);
+              }
+            }}
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 10px', borderRadius: 8,
-              border: '1.5px solid var(--border)', background: 'var(--bg-card)',
-              cursor: 'pointer', boxShadow: 'var(--shadow-sm)',
-              color: 'var(--text-tertiary)', fontSize: 11, fontWeight: 600
+              padding: '6px 12px', borderRadius: 12,
+              border: weightLogged ? '1px solid rgba(16, 185, 129, 0.4)' : '1.5px solid rgba(15, 23, 42, 0.15)',
+              background: weightLogged ? 'var(--glass-green-gradient)' : 'var(--glass-bg-tint)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              cursor: 'pointer',
+              boxShadow: weightLogged ? 'var(--glass-green-shadow)' : 'var(--glass-shadow-sm)',
+              color: weightLogged ? '#FFFFFF' : 'var(--text-primary)',
+              fontSize: 12, fontWeight: 700,
+              transition: 'all 0.25s ease',
             }}
             aria-label="Log weight"
           >
-            <Scale size={12} strokeWidth={2.2} />
-            Log Wt.
+            {weightLogged ? <Check size={13} strokeWidth={3} color="#FFFFFF" /> : <Scale size={13} strokeWidth={2.2} color="#475569" />}
+            {weightLogged ? 'Wt. Logged' : 'Log Wt.'}
           </button>
         </div>
         {template.exercises.map((exT, idx) => {
@@ -403,13 +475,16 @@ function Workout() {
           return (
             <div 
               key={idx} 
+              className="glass-card"
               style={{
-                backgroundColor: isDone ? '#f0fdf4' : 'var(--bg-card)',
-                borderRadius: 14,
-                border: isDone ? '2px solid #86efac' : '2px solid var(--border)',
+                backgroundColor: isDone ? 'var(--glass-green-bg)' : undefined,
+                borderRadius: 20,
+                border: isDone ? '1px solid rgba(34, 197, 94, 0.25)' : undefined,
                 padding: '14px 16px',
                 marginBottom: 12,
-                boxShadow: isDone ? '0 0 0 1px rgba(34,197,94,0.1)' : 'var(--shadow-sm)',
+                boxShadow: isDone
+                  ? 'var(--glass-green-shadow), var(--glass-rim)'
+                  : undefined,
                 transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
@@ -420,8 +495,8 @@ function Workout() {
                     width: 28,
                     height: 28,
                     borderRadius: '50%',
-                    border: isDone ? '2px solid #22c55e' : '2px solid var(--border)',
-                    backgroundColor: isDone ? '#22c55e' : 'var(--bg-card)',
+                    border: isDone ? 'none' : '2px solid rgba(148, 163, 184, 0.3)',
+                    background: isDone ? 'var(--glass-green-gradient)' : 'var(--glass-bg)',
                     color: isDone ? '#FFFFFF' : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
@@ -430,17 +505,17 @@ function Workout() {
                     flexShrink: 0,
                     marginTop: 1,
                     transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: isDone ? '0 2px 8px rgba(34,197,94,0.25)' : 'none'
+                    boxShadow: isDone ? 'var(--glass-green-shadow)' : 'var(--glass-shadow-sm)'
                   }}
                 >
-                  {isDone && <Check size={16} strokeWidth={3} />}
+                  {isDone && <Check size={16} strokeWidth={3} color="#FFFFFF" />}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0, userSelect: 'none' }}>
                   <span style={{ 
                     fontSize: 15, 
                     fontWeight: '700', 
-                    color: isDone ? '#15803d' : 'var(--text-primary)', 
+                    color: isDone ? '#0F172A' : 'var(--text-primary)', 
                     display: 'block', 
                     letterSpacing: '-0.01em',
                     lineHeight: 1.2,
@@ -450,28 +525,32 @@ function Workout() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
                     <span style={{ 
                       fontSize: 11, 
-                      color: isDone ? '#15803d' : 'var(--text-secondary)', 
-                      padding: '2px 8px',
-                      border: isDone ? '1px solid #bbf7d0' : '1px solid #e0e0e0',
-                      borderRadius: 6,
-                      fontWeight: 600,
-                      background: isDone ? '#dcfce7' : '#f0f0f0',
+                      color: isDone ? 'var(--text-green)' : 'var(--text-primary)', 
+                      padding: '3px 10px',
+                      border: isDone ? '1px solid rgba(16, 185, 129, 0.2)' : 'var(--glass-border-strong)',
+                      borderRadius: 10,
+                      fontWeight: 700,
+                      background: isDone ? 'var(--glass-green-bg)' : 'var(--glass-bg)',
                       lineHeight: '16px',
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
                     }}>
                       {numSets} sets
                     </span>
-                    <span style={{ fontSize: 10, color: isDone ? '#86efac' : '#bbbbbb', fontWeight: 700 }}>×</span>
+                    <span style={{ fontSize: 10, color: isDone ? 'var(--text-green)' : 'var(--text-tertiary)', fontWeight: 700 }}>×</span>
                     <span style={{ 
                       fontSize: 11, 
-                      color: isDone ? '#15803d' : '#ffffff', 
-                      padding: '2px 8px',
-                      border: isDone ? '1px solid #bbf7d0' : '1px solid #aaaaaa',
-                      borderRadius: 6,
-                      fontWeight: 600,
-                      background: isDone ? '#dcfce7' : '#aaaaaa',
+                      color: isDone ? 'var(--text-green)' : 'var(--text-primary)', 
+                      padding: '3px 10px',
+                      border: isDone ? '1px solid rgba(16, 185, 129, 0.2)' : 'var(--glass-border-strong)',
+                      borderRadius: 10,
+                      fontWeight: 700,
+                      background: isDone ? 'var(--glass-green-bg)' : 'var(--glass-bg)',
                       lineHeight: '16px',
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
                     }}>
-                      {exT.reps}{isAmrapSet ? '+' : ''} reps
+                      {exT.reps || '8-12'} {isAmrapSet ? 'AMRAP' : 'reps'}
                     </span>
                   </div>
                 </div>
@@ -521,6 +600,39 @@ function Workout() {
           to { transform: translateX(-50%) translateY(24px); opacity: 0; }
         }
       `}</style>
+
+      <Modal isOpen={showWeightInfoModal} onClose={() => setShowWeightInfoModal(false)} type="centered-alert">
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: 'var(--accent-mint)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 16px',
+            boxShadow: 'var(--glass-green-shadow)',
+          }}>
+            <Check size={24} strokeWidth={3} color="#fff" />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-green)', fontWeight: 600, marginBottom: 4 }}>Today's Weight</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>{todayWeight} <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)' }}>kg</span></div>
+          <button
+            onClick={() => {
+              setShowWeightInfoModal(false);
+              setWeightInput(String(todayWeight));
+              setShowWeightModal(true);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              width: '100%', padding: '10px', marginTop: 20, borderRadius: 10,
+              border: '1.5px solid var(--border)', background: 'var(--bg-tertiary)',
+              cursor: 'pointer', color: 'var(--text-primary)',
+              fontSize: 13, fontWeight: 600,
+            }}
+          >
+            <Pencil size={13} strokeWidth={2.5} />
+            Edit Weight
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

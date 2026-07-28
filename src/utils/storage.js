@@ -92,9 +92,14 @@ export function getBodyStats() {
 
 export function saveBodyStat(stat) {
   const stats = getBodyStats();
-  stat.id = Date.now();
   stat.date = stat.date || getToday();
-  stats.push(stat);
+  const existingIdx = stats.findIndex(s => s.date === stat.date);
+  if (existingIdx !== -1) {
+    stats[existingIdx].weight = stat.weight;
+  } else {
+    stat.id = Date.now();
+    stats.push(stat);
+  }
   setItem(STORAGE_KEYS.BODY_STATS, stats);
   return stat;
 }

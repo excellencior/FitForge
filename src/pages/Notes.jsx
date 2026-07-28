@@ -2,14 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StickyNote } from 'lucide-react';
 import { getDailyNotes, saveDailyNote } from '../utils/storage';
 
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const DAY_LABELS = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
-const DAY_FULL_LABELS = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
-const DAY_INDEX_MAP = [/*sun*/6, /*mon*/0, /*tue*/1, /*wed*/2, /*thu*/3, /*fri*/4, /*sat*/5];
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const DAY_LABELS = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+const DAY_FULL_LABELS = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
 
 export default function Notes() {
   const todayDayIndex = new Date().getDay();
-  const todayKey = DAY_KEYS[DAY_INDEX_MAP[todayDayIndex]];
+  const todayKey = DAY_KEYS[todayDayIndex];
   const [activeDay, setActiveDay] = useState(todayKey);
   const [notes, setNotes] = useState(() => getDailyNotes());
   const timerRef = useRef(null);
@@ -123,7 +122,6 @@ const styles = {
   pageWrapper: {
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '100vh',
     minHeight: '100dvh',
     padding: 20,
     paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
@@ -141,29 +139,31 @@ const styles = {
     paddingTop: 8,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    background: 'var(--bg-card)',
-    border: '2px solid var(--border)',
-    boxShadow: 'var(--shadow-sm)',
+    background: 'var(--glass-bg-elevated)',
+    border: '1px solid rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    boxShadow: 'var(--glass-shadow-sm)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   pageTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: 800,
-    color: 'var(--text-primary)',
+    color: '#0F172A',
     margin: 0,
     letterSpacing: '-0.03em',
     lineHeight: 1.2,
   },
   pageSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 600,
-    color: 'var(--text-tertiary)',
+    color: '#475569',
     margin: '2px 0 0',
     letterSpacing: '0.01em',
   },
@@ -171,24 +171,27 @@ const styles = {
     display: 'flex',
     gap: 4,
     marginBottom: 16,
-    background: 'var(--bg-tertiary)',
-    borderRadius: 12,
-    padding: 4,
-    border: '2px solid var(--border)',
+    background: 'var(--glass-bg-elevated)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    borderRadius: 16,
+    padding: 5,
+    border: 'var(--glass-border)',
+    boxShadow: 'var(--glass-shadow), var(--glass-rim)',
     flexShrink: 0,
   },
   tab: {
     flex: 1,
     padding: '10px 0',
-    borderRadius: 8,
+    borderRadius: 12,
     fontSize: 11,
     fontWeight: 700,
     color: 'var(--text-tertiary)',
     background: 'transparent',
-    border: '2px solid transparent',
+    border: '1px solid transparent',
     cursor: 'pointer',
     textAlign: 'center',
-    transition: 'all 0.15s ease',
+    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
     fontFamily: 'var(--font-family)',
     WebkitTapHighlightColor: 'transparent',
     letterSpacing: '0.02em',
@@ -196,10 +199,10 @@ const styles = {
     position: 'relative',
   },
   tabActive: {
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
-    border: '2px solid var(--border)',
-    boxShadow: '2px 2px 0px var(--border)',
+    background: 'var(--accent-dark-subtle)',
+    color: '#0F172A',
+    border: 'var(--glass-border-strong)',
+    boxShadow: 'var(--glass-shadow-sm)',
   },
   tabToday: {
     color: 'var(--text-secondary)',
@@ -212,13 +215,16 @@ const styles = {
     width: 4,
     height: 4,
     borderRadius: '50%',
-    background: 'var(--text-primary)',
+    background: '#0F172A',
   },
   noteCard: {
-    background: 'transparent',
-    borderRadius: 0,
-    padding: '0 4px',
-    border: 'none',
+    background: 'var(--glass-bg-elevated)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    borderRadius: 20,
+    padding: 20,
+    border: 'var(--glass-border)',
+    boxShadow: 'var(--glass-shadow-md), var(--glass-rim)',
     flex: 1,
     display: 'flex',
     flexDirection: 'column',

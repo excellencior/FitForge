@@ -10,7 +10,7 @@ import { exercises as defaultExercises } from '../data/workouts';
 import Modal from '../components/Modal';
 import {
   Plus, Minus, X, Trash2, Check, Edit3, ChevronDown, ChevronUp,
-  Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star, Calendar,
+  Play, AlertTriangle, Dumbbell, RotateCcw, Zap, Star,
   GripVertical, Sparkles, Search, Moon, PersonStanding
 } from 'lucide-react';
 import MuscleMap, { MuscleMapLazy } from '../components/MuscleMap';
@@ -159,13 +159,13 @@ const getTierColor = (exId) => {
 
 
 const WEEKDAYS = [
+  { key: 'sun', label: 'Sun' },
   { key: 'mon', label: 'Mon' },
   { key: 'tue', label: 'Tue' },
   { key: 'wed', label: 'Wed' },
   { key: 'thu', label: 'Thu' },
   { key: 'fri', label: 'Fri' },
   { key: 'sat', label: 'Sat' },
-  { key: 'sun', label: 'Sun' },
 ];
 
 export default function WorkoutSheets() {
@@ -521,24 +521,29 @@ export default function WorkoutSheets() {
     showToast(`Schedule updated`, 'success');
   };
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+  }, []);
+
   const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
 
   return (
     <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + var(--safe-bottom) + 32px)', display: 'flex', flexDirection: 'column' }}>
       
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: 0 }}>
+      <div style={{ marginBottom: 28, paddingTop: 4 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: '#0F172A', margin: 0, lineHeight: 1.2 }}>
           Workout Sheets
         </h1>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, letterSpacing: '-0.01em', margin: '4px 0 0' }}>
-          Create, customize, and schedule your weekly plans
+        <p style={{ fontSize: 13, color: '#475569', marginTop: 4, letterSpacing: '-0.01em', margin: '4px 0 0', fontWeight: 600 }}>
+          Manage your weekly routines
         </p>
       </div>
 
       {/* Weekly Schedule */}
       <div style={{ marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Weekly Schedule</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
           {WEEKDAYS.map(day => {
             const assignedSheetId = schedule[day.key];
@@ -552,15 +557,21 @@ export default function WorkoutSheets() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
                   cursor: 'pointer'
                 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: isToday ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{day.label}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: isToday ? '#0F172A' : 'var(--text-secondary)' }}>{day.label}</div>
                 <div style={{
                   width: 38, height: 38, borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: assignedSheetId ? 'var(--text-primary)' : 'var(--bg-card)',
-                  border: assignedSheetId ? '2px solid var(--text-primary)' : '2px dashed var(--border-light)',
-                  boxShadow: assignedSheetId ? 'var(--shadow-sm)' : 'none',
+                  background: assignedSheetId 
+                    ? 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)' 
+                    : 'var(--glass-bg-hover)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: assignedSheetId ? 'none' : 'var(--glass-border-strong)',
+                  boxShadow: assignedSheetId 
+                    ? 'var(--glass-shadow-md)' 
+                    : 'var(--glass-shadow-sm)',
                 }}>
-                   {assignedSheetId ? <Dumbbell size={18} color="var(--bg-primary)" strokeWidth={2.4} /> : <Moon size={16} color="var(--border-light)" strokeWidth={2} />}
+                   {assignedSheetId ? <Dumbbell size={18} color="#FFFFFF" strokeWidth={2.4} /> : <Moon size={16} color="var(--text-tertiary)" strokeWidth={2} />}
                 </div>
               </div>
             )
@@ -571,15 +582,12 @@ export default function WorkoutSheets() {
       {/* Sheets List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
         {sheets.length === 0 && (
-          <div style={{
+          <div className="glass-card" style={{
             textAlign: 'center',
             padding: '40px 20px',
-            background: 'var(--bg-card)',
-            border: '2px dashed var(--border)',
             borderRadius: '20px',
             color: 'var(--text-tertiary)',
             fontSize: 13,
-            boxShadow: 'var(--shadow-sm)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -592,21 +600,60 @@ export default function WorkoutSheets() {
         )}
         {sheets.map(sheet => {
           const isExpanded = expandedSheet === sheet.id;
+          const assignedDays = WEEKDAYS.filter(d => schedule[d.key] === sheet.id);
+          const isAssignedToday = schedule[todayKey] === sheet.id;
+
           return (
             <div 
               key={sheet.id} 
+              className="glass-card"
               style={{
-                background: 'var(--bg-card)',
                 borderRadius: '20px',
-                border: '2px solid var(--border)',
-                boxShadow: 'var(--shadow-sm)',
                 padding: '16px',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                position: 'relative',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                 animation: deletingSheetId === sheet.id 
                   ? 'sheetsCardRemove 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards' 
                   : 'sheetsCardInsert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
               }}
             >
+              {/* Assigned weekday(s) badge — individual day pills, today highlighted */}
+              {assignedDays.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: 10,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  zIndex: 2,
+                }}>
+                  {assignedDays.map(d => {
+                    const isToday = d.key === todayKey;
+                    return (
+                      <span
+                        key={d.key}
+                        style={{
+                          fontSize: 8,
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: 6,
+                          letterSpacing: '0.05em',
+                          textTransform: 'uppercase',
+                          lineHeight: 1.3,
+                          background: isToday ? 'var(--accent-mint)' : 'var(--glass-bg-tint)',
+                          color: isToday ? '#FFFFFF' : 'var(--text-tertiary)',
+                          border: isToday ? '1px solid rgba(16, 185, 129, 0.3)' : 'var(--glass-border-strong)',
+                          boxShadow: isToday ? '0 2px 6px rgba(16, 185, 129, 0.2)' : 'none',
+                        }}
+                      >
+                        {d.label.toUpperCase()}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               {/* Sheet Header */}
               <div
                 style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
@@ -615,12 +662,27 @@ export default function WorkoutSheets() {
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{sheet.name}</span>
-                      {schedule[todayKey] === sheet.id && <Star size={12} fill="#333" color="#333" />}
+                      <span style={{ fontWeight: 700, fontSize: 16, color: '#0F172A', letterSpacing: '-0.01em' }}>{sheet.name}</span>
+                      {isAssignedToday && (
+                        <span 
+                          title="Assigned for Today"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'var(--accent-gold-light)',
+                            border: '1px solid rgba(245, 158, 11, 0.35)',
+                            borderRadius: '50%',
+                            width: 22,
+                            height: 22,
+                          }}
+                        >
+                          <Star size={12} fill="#F59E0B" color="#F59E0B" />
+                        </span>
+                      )}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: '#64748B', marginTop: 4, fontWeight: 500 }}>
                       {sheet.exercises?.length || 0} exercises
-                      {sheet.startDate && sheet.endDate && ` · ${sheet.startDate} to ${sheet.endDate}`}
                     </div>
                   </div>
                 </div>
@@ -628,8 +690,8 @@ export default function WorkoutSheets() {
                   width: 28,
                   height: 28,
                   borderRadius: '50%',
-                  background: 'var(--bg-secondary)',
-                  border: '2px solid var(--border)',
+                  background: 'var(--glass-bg)',
+                  border: 'var(--glass-border-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -641,7 +703,7 @@ export default function WorkoutSheets() {
               {/* Expanded Content */}
               {isExpanded && (
                 <div style={{
-                  borderTop: '2px solid var(--border)',
+                  borderTop: 'var(--glass-border-separator)',
                   marginTop: 12,
                   paddingTop: 12,
                   animation: 'sheetsContentExpand 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
@@ -657,15 +719,12 @@ export default function WorkoutSheets() {
                       const info = getExerciseInfo(ex.exerciseId);
                       const type = getExerciseType(ex.exerciseId);
                       return (
-                        <div key={i} style={{
+                        <div key={i} className="glass-card" style={{
                           display: 'flex', 
                           alignItems: 'center', 
                           gap: 12,
                           padding: '12px 14px', 
-                          background: 'var(--bg-secondary)', 
-                          borderRadius: '14px',
-                          border: '2px solid var(--border)',
-                          boxShadow: 'var(--shadow-sm)',
+                          borderRadius: '16px',
                         }}>
                           <div style={{
                             width: 32,
@@ -682,7 +741,7 @@ export default function WorkoutSheets() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{info.name}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-                              {ex.minSets || ex.sets || 3}{ex.maxSets ? `-${ex.maxSets}` : ''} × {ex.reps}{ex.amrap ? '+' : ''} · Rest {ex.restMinutes}m
+                              {ex.minSets || ex.sets || 3} sets × {ex.reps}{ex.amrap ? '+' : ''} reps · Rest {ex.restMinutes}m
                             </div>
                           </div>
                           {ex.amrap && (
@@ -755,26 +814,24 @@ export default function WorkoutSheets() {
 
       {/* Create New Sheet Button */}
       <button 
-        className="sheet-btn"
+        className="sheet-btn glass-card"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
           width: '100%',
-          background: 'var(--text-primary)',
-          color: 'var(--bg-primary)',
-          border: '2px solid var(--border)',
-          borderRadius: '14px',
+          color: 'var(--text-primary)',
+          borderRadius: '20px',
           padding: '14px 20px',
           fontSize: 14,
           fontWeight: 700,
           cursor: 'pointer',
-          boxShadow: 'var(--shadow-sm)',
+          boxShadow: '0 2px 6px rgba(15, 23, 42, 0.02), var(--glass-rim)',
         }} 
         onClick={openNewSheet}
       >
-        <Plus size={16} strokeWidth={2.4} /> Create New Workout Sheet
+        <Plus size={16} strokeWidth={2.4} color="#7C5CFF" /> Create New
       </button>
 
       {/* ===== DAY PICKER MODAL ===== */}
@@ -789,7 +846,7 @@ export default function WorkoutSheets() {
             className="sheet-btn"
             style={{
               display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-              padding: '14px', background: !schedule[dayPickerDay] ? 'var(--bg-secondary)' : 'var(--bg-card)',
+              padding: '14px', background: !schedule[dayPickerDay] ? 'var(--glass-bg-elevated)' : 'var(--glass-bg)',
               borderRadius: '12px', border: '2px solid var(--border)', cursor: 'pointer',
               boxShadow: 'var(--shadow-sm)'
             }}
@@ -810,7 +867,7 @@ export default function WorkoutSheets() {
                 className="sheet-btn"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-                  padding: '14px', background: isAssigned ? 'var(--bg-secondary)' : 'var(--bg-card)',
+                  padding: '14px', background: isAssigned ? 'var(--glass-bg-elevated)' : 'var(--glass-bg)',
                   borderRadius: '12px', border: '2px solid var(--border)', cursor: 'pointer',
                   boxShadow: 'var(--shadow-sm)'
                 }}
@@ -842,13 +899,17 @@ export default function WorkoutSheets() {
           <div style={{
             position: 'sticky',
             top: -24,
-            background: 'var(--bg-secondary)',
+            background: 'rgba(255, 255, 255, 0.65)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
             zIndex: 101,
             margin: '-24px -20px 16px -20px',
             padding: '16px 20px 12px 20px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            borderBottom: 'var(--glass-border-strong)',
+            boxShadow: 'var(--glass-shadow-sm)',
           }}>
             <h2 style={{
               fontSize: 20,
@@ -864,9 +925,9 @@ export default function WorkoutSheets() {
                 disabled={!editingSheet.name.trim()}
                 className="catalog-chip"
                 style={{
-                  background: editingSheet.name.trim() ? 'var(--text-primary)' : 'var(--bg-secondary)',
-                  color: editingSheet.name.trim() ? 'var(--bg-primary)' : 'var(--text-tertiary)',
-                  border: editingSheet.name.trim() ? 'none' : '1.5px solid var(--border)',
+                  background: editingSheet.name.trim() ? 'var(--text-primary)' : 'rgba(255, 255, 255, 0.4)',
+                  color: editingSheet.name.trim() ? '#FFFFFF' : 'var(--text-tertiary)',
+                  border: editingSheet.name.trim() ? 'none' : '1px solid rgba(255, 255, 255, 0.5)',
                   borderRadius: '100px',
                   padding: '7px 20px',
                   fontSize: 13,
@@ -901,18 +962,18 @@ export default function WorkoutSheets() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 16 }}>
             {/* Sheet Info Card */}
             <div style={{
-              background: 'var(--bg-card)',
-              borderRadius: '14px',
-              border: '2px solid var(--border)',
+              background: 'rgba(255, 255, 255, 0.55)',
+              borderRadius: '20px',
+              border: '1px solid rgba(15, 23, 42, 0.06)',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: 'var(--shadow-sm)',
+              boxShadow: '0 2px 8px -2px rgba(15, 23, 42, 0.06), 0 4px 16px -4px rgba(15, 23, 42, 0.04), var(--glass-rim)',
               overflow: 'hidden',
             }}>
               {/* Row 1: Name */}
               <div className="ios-form-row" style={{
                 padding: '12px 16px',
-                borderBottom: '2px solid var(--border)',
+                borderBottom: 'var(--glass-border-separator)',
               }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Sheet Name *</label>
                 <input
@@ -936,7 +997,6 @@ export default function WorkoutSheets() {
               {/* Row 2: Description */}
               <div className="ios-form-row" style={{
                 padding: '12px 16px',
-                borderBottom: '2px solid var(--border)',
               }}>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Description</label>
                 <input
@@ -957,56 +1017,7 @@ export default function WorkoutSheets() {
                 />
               </div>
 
-              {/* Row 3: Grid of Dates */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                <div className="ios-form-row" style={{
-                  padding: '12px 16px',
-                  borderRight: '2px solid var(--border)',
-                }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                    <Calendar size={11} strokeWidth={2.4} /> Start Date
-                  </label>
-                  <input
-                    style={{
-                      width: '100%',
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '4px 0',
-                      fontSize: 13,
-                      color: 'var(--text-primary)',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                    type="date"
-                    value={editingSheet.startDate || ''}
-                    onChange={e => setEditingSheet(p => ({ ...p, startDate: e.target.value }))}
-                    onFocus={handleFocus}
-                  />
-                </div>
-                <div className="ios-form-row" style={{
-                  padding: '12px 16px',
-                }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                    <Calendar size={11} strokeWidth={2.4} /> End Date
-                  </label>
-                  <input
-                    style={{
-                      width: '100%',
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '4px 0',
-                      fontSize: 13,
-                      color: 'var(--text-primary)',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                    type="date"
-                    value={editingSheet.endDate || ''}
-                    onChange={e => setEditingSheet(p => ({ ...p, endDate: e.target.value }))}
-                    onFocus={handleFocus}
-                  />
-                </div>
-              </div>
+
             </div>
 
             {/* Exercises in Sheet */}
@@ -1018,7 +1029,7 @@ export default function WorkoutSheets() {
               {(!editingSheet.exercises || editingSheet.exercises.length === 0) && (
                 <button
                   onClick={() => { exercisesSnapshot.current = [...(editingSheet?.exercises || [])]; setShowCatalog(true); }}
-                  style={{ padding: '28px 16px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '16px', border: '2px dashed var(--border)', boxShadow: 'var(--shadow-sm)', width: '100%', cursor: 'pointer' }}
+                  style={{ padding: '28px 16px', textAlign: 'center', background: 'var(--glass-bg-subtle)', borderRadius: '16px', border: '1.5px dashed rgba(15, 23, 42, 0.12)', boxShadow: 'none', width: '100%', cursor: 'pointer' }}
                 >
                   <Dumbbell size={28} strokeWidth={2.2} color="var(--text-tertiary)" style={{ marginBottom: 8 }} />
                   <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>No exercises added yet</div>
@@ -1040,8 +1051,8 @@ export default function WorkoutSheets() {
                     width: 28,
                     height: 28,
                     borderRadius: '8px',
-                    border: '2px solid var(--border)',
-                    background: 'var(--bg-card)',
+                    border: 'var(--glass-border-subtle)',
+                    background: 'var(--glass-bg)',
                     color: 'var(--text-primary)',
                     display: 'flex',
                     alignItems: 'center',
@@ -1062,16 +1073,16 @@ export default function WorkoutSheets() {
                       onDragOver={(e) => handleDragOver(e, i)}
                       onDragEnd={handleDragEnd}
                       style={{
-                        background: isDragging ? 'var(--bg-secondary)' : 'var(--bg-card)',
-                        borderRadius: '14px',
+                        background: isDragging ? 'var(--glass-bg-subtle)' : 'var(--glass-bg)',
+                        borderRadius: '20px',
                         border: isDragging 
-                          ? '2px dashed var(--border)' 
-                          : (isOpen ? '2px solid var(--text-primary)' : '2px solid var(--border)'),
+                          ? '1.5px dashed rgba(15, 23, 42, 0.12)' 
+                          : (isOpen ? '1px solid rgba(15, 23, 42, 0.1)' : '1px solid rgba(15, 23, 42, 0.06)'),
                         overflow: 'hidden',
                         transition: 'transform 0.38s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
                         opacity: isDragging ? 0.3 : 1,
                         transform: isDragging ? 'scale(0.98)' : 'scale(1)',
-                        boxShadow: isDragging ? 'none' : 'var(--shadow-sm)',
+                        boxShadow: isDragging ? 'none' : '0 2px 8px -2px rgba(15, 23, 42, 0.06), 0 4px 16px -4px rgba(15, 23, 42, 0.04), var(--glass-rim)',
                         animation: removingExIdx === i
                           ? 'sheetsExRemove 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards'
                           : 'sheetsExInsert 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
@@ -1108,7 +1119,7 @@ export default function WorkoutSheets() {
                             width: 28, 
                             height: 28, 
                             borderRadius: '8px',
-                            background: 'var(--bg-secondary)', 
+                            background: 'var(--glass-bg)', 
                             color: 'var(--text-primary)', 
                             border: '2px solid var(--border)',
                             display: 'flex',
@@ -1305,10 +1316,7 @@ export default function WorkoutSheets() {
       <Modal
         isOpen={showCatalog}
         onClose={() => {
-          if (exercisesSnapshot.current !== null) {
-            setEditingSheet(prev => prev ? { ...prev, exercises: exercisesSnapshot.current } : prev);
-            exercisesSnapshot.current = null;
-          }
+          exercisesSnapshot.current = null;
           setShowCatalog(false); setCatalogExpanded(false); catalogExpandedRef.current = false; setCatalogSearchOpen(false); setCatalogSearch('');
         }}
         type="bottom-sheet"
@@ -1321,11 +1329,14 @@ export default function WorkoutSheets() {
         <div style={{
           position: 'sticky',
           top: -24,
-          background: 'var(--bg-secondary)',
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           zIndex: 101,
           margin: '-24px -20px 12px -20px',
           padding: '16px 20px 12px 20px',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: 'var(--glass-border-strong)',
+          boxShadow: 'var(--glass-shadow-sm)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 36, position: 'relative' }}>
             {/* Anatomy toggle — always visible, search expands up to it */}
@@ -1367,8 +1378,8 @@ export default function WorkoutSheets() {
               alignItems: 'center',
               transition: 'opacity 0.2s ease, flex 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
               borderRadius: 10,
-              border: '1.5px solid var(--border)',
-              background: 'var(--bg-card)',
+              border: 'var(--glass-border-strong)',
+              background: 'var(--glass-bg)',
             }}>
               <Search size={15} strokeWidth={2.4} color="var(--text-tertiary)" style={{ position: 'absolute', left: 10, pointerEvents: 'none', zIndex: 1 }} />
               <input
@@ -1525,9 +1536,11 @@ export default function WorkoutSheets() {
                         gap: anatomyMode ? 8 : 12,
                         width: '100%',
                         padding: '12px 14px',
-                        background: alreadyAdded ? '#f0fdf4' : 'var(--bg-card)',
-                        borderRadius: '14px',
-                        border: alreadyAdded ? '1.5px solid #86efac' : '1.5px solid var(--border)',
+                        background: alreadyAdded ? 'var(--glass-green-bg)' : 'rgba(255, 255, 255, 0.55)',
+                        borderRadius: '20px',
+                        border: alreadyAdded 
+                          ? 'var(--glass-green-border)' 
+                          : '1px solid rgba(15, 23, 42, 0.06)',
                         cursor: 'pointer',
                         textAlign: 'left',
                         boxSizing: 'border-box',
@@ -1536,6 +1549,9 @@ export default function WorkoutSheets() {
                         position: 'relative',
                         overflow: 'hidden',
                         animationDelay: `${Math.min(i * 20, 300)}ms`,
+                        boxShadow: alreadyAdded
+                          ? 'var(--glass-green-shadow), var(--glass-rim)'
+                          : '0 2px 8px -2px rgba(15, 23, 42, 0.06), 0 4px 16px -4px rgba(15, 23, 42, 0.04), var(--glass-rim)',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
@@ -1543,12 +1559,13 @@ export default function WorkoutSheets() {
                           width: 34,
                           height: 34,
                           borderRadius: alreadyAdded ? '50%' : '10px',
-                          background: alreadyAdded ? '#22c55e' : 'var(--bg-secondary)',
-                          border: alreadyAdded ? '1.5px solid #16a34a' : '1.5px solid var(--border)',
+                          background: alreadyAdded ? 'var(--glass-green-gradient)' : 'var(--glass-bg-tint)',
+                          border: alreadyAdded ? 'none' : 'var(--glass-border-subtle)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           transition: 'all 0.2s ease',
+                          boxShadow: alreadyAdded ? 'var(--glass-green-shadow)' : 'none',
                         }}>
                           {alreadyAdded ? (
                             <Check size={16} strokeWidth={3} color="#FFFFFF" />
@@ -1557,8 +1574,8 @@ export default function WorkoutSheets() {
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: alreadyAdded ? '#15803d' : 'var(--text-primary)' }}>{ex.name}</div>
-                          <div style={{ fontSize: 11, color: alreadyAdded ? '#4ade80' : 'var(--text-tertiary)', marginTop: 2, fontWeight: 600 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{ex.name}</div>
+                          <div style={{ fontSize: 11, color: alreadyAdded ? '#059669' : 'var(--text-tertiary)', marginTop: 2, fontWeight: 600 }}>
                             {ex.muscle} · <span style={{ textTransform: 'capitalize' }}>{ex.category}</span>
                           </div>
                         </div>
@@ -1571,16 +1588,16 @@ export default function WorkoutSheets() {
                               position: 'absolute',
                               right: -1,
                               top: -1,
-                              padding: '4px 8px',
+                              padding: '5px 9px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: 4,
-                              color: '#fff',
+                              color: 'var(--text-secondary)',
                               cursor: 'pointer',
-                              borderRadius: '0 13px 0 10px',
+                              borderRadius: '0 15px 0 12px',
                               border: 'none',
-                              background: '#1a1a1a',
+                              background: 'rgba(15, 23, 42, 0.06)',
                               WebkitTapHighlightColor: 'transparent',
                               transition: 'opacity 0.15s ease',
                               zIndex: 2,
@@ -1635,11 +1652,14 @@ export default function WorkoutSheets() {
               <div style={{
                 position: 'sticky',
                 top: -24,
-                background: 'var(--bg-secondary)',
+                background: 'rgba(255, 255, 255, 0.65)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
                 zIndex: 101,
                 margin: '-24px -20px 16px -20px',
                 padding: '16px 20px 12px 20px',
-                borderBottom: '1px solid var(--border)',
+                borderBottom: 'var(--glass-border-strong)',
+                boxShadow: '0 4px 12px -4px rgba(15, 23, 42, 0.04)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1730,7 +1750,7 @@ export default function WorkoutSheets() {
           width: 48,
           height: 48,
           borderRadius: '50%',
-          background: 'var(--bg-secondary)',
+          background: 'var(--glass-bg)',
           border: '2px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
@@ -1750,7 +1770,7 @@ export default function WorkoutSheets() {
             className="sheet-btn"
             style={{ 
               flex: 1,
-              background: 'var(--bg-secondary)',
+              background: 'var(--glass-bg)',
               color: 'var(--text-primary)',
               border: '2px solid var(--border)',
               borderRadius: '12px',
@@ -1768,7 +1788,7 @@ export default function WorkoutSheets() {
             className="sheet-btn"
             style={{ 
               flex: 1,
-              background: 'var(--bg-secondary)',
+              background: 'var(--glass-bg)',
               color: 'var(--text-primary)',
               border: '2px solid var(--border)',
               borderRadius: '12px',
@@ -1813,7 +1833,7 @@ export default function WorkoutSheets() {
             borderRadius: 50, 
             fontSize: 13, 
             fontWeight: 700,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.1)',
+            boxShadow: 'var(--glass-shadow-lg)',
             display: 'flex', 
             alignItems: 'center', 
             gap: 10,

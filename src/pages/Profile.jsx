@@ -90,7 +90,7 @@ export default function Profile() {
             width: 40, 
             height: 40, 
             borderRadius: '50%', 
-            background: 'var(--bg-card)', 
+            background: 'var(--glass-bg)', 
             border: '2px solid var(--border)', 
             display: 'flex', 
             alignItems: 'center', 
@@ -116,7 +116,7 @@ export default function Profile() {
       <div 
         className="card" 
         style={{ 
-          background: 'var(--bg-card)', 
+          background: 'var(--glass-bg)', 
           border: '2px solid var(--border)', 
           boxShadow: 'var(--shadow-md)', 
           borderRadius: 18, 
@@ -161,7 +161,7 @@ export default function Profile() {
       <div 
         className="card" 
         style={{ 
-          background: 'var(--bg-card)', 
+          background: 'var(--glass-bg)', 
           border: '2px solid var(--border)', 
           boxShadow: 'var(--shadow-md)', 
           borderRadius: 18, 
@@ -269,7 +269,7 @@ export default function Profile() {
       <div 
         className="card" 
         style={{ 
-          background: 'var(--bg-card)', 
+          background: 'var(--glass-bg)', 
           border: '2px solid var(--border)', 
           boxShadow: 'var(--shadow-md)', 
           borderRadius: 18, 
@@ -336,7 +336,7 @@ export default function Profile() {
               onClick={() => { const cleared = saveDeloadTracker('', ''); setDeloadTrackerState(cleared); }}
               style={{
                 padding: '4px 12px', borderRadius: 8, border: '1.5px solid var(--border)',
-                background: 'var(--bg-card)', color: 'var(--text-secondary)',
+                background: 'var(--glass-bg)', color: 'var(--text-secondary)',
                 fontSize: 11, fontWeight: 700, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 4
               }}
@@ -351,7 +351,7 @@ export default function Profile() {
       <div 
         className="card" 
         style={{ 
-          background: 'var(--bg-card)', 
+          background: 'var(--glass-bg)', 
           border: '2px solid var(--border)', 
           boxShadow: 'var(--shadow-md)', 
           borderRadius: 18, 
@@ -416,7 +416,7 @@ export default function Profile() {
               padding: '12px',
               borderRadius: 12,
               border: '2px solid var(--border)',
-              background: 'var(--bg-card)',
+              background: 'var(--glass-bg)',
               color: 'var(--text-primary)',
               fontSize: 14,
               fontWeight: 700,

@@ -63,12 +63,16 @@ export default function Modal({ isOpen, onClose, title, type = 'bottom-sheet', f
             <div style={{
               position: 'sticky',
               top: -24,
-              background: 'var(--bg-secondary)',
+              background: 'rgba(255, 255, 255, 0.65)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
               zIndex: 100,
               margin: '-24px -20px 20px -20px',
-              padding: '20px 20px 20px 20px',
+              padding: '20px 20px 16px 20px',
               borderTopLeftRadius: '22px',
               borderTopRightRadius: '22px',
+              borderBottom: 'var(--glass-border-strong)',
+              boxShadow: 'var(--glass-shadow-sm)',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {title && (
